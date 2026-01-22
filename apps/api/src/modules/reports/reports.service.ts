@@ -7,7 +7,7 @@ export class ReportsService {
   constructor(
     @Inject(SUPABASE_CLIENT)
     private readonly supabase: SupabaseClient,
-  ) {}
+  ) { }
 
   async getDailySales(tenantId: string, date?: string) {
     const targetDate = date || new Date().toISOString().split('T')[0];
@@ -113,8 +113,15 @@ export class ReportsService {
       { id: string; name: string; code: string; quantity: number; revenue: number }
     > = {};
 
-    data?.forEach((item) => {
-      const product = item.product as { id: string; name: string; code: string };
+    data?.forEach((item: any) => {
+      const product = (Array.isArray(item.product) ? item.product[0] : item.product) as {
+        id: string;
+        name: string;
+        code: string;
+      };
+
+      if (!product) return;
+
       if (!productStats[product.id]) {
         productStats[product.id] = {
           id: product.id,

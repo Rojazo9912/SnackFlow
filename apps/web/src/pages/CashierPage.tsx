@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
   Clock,
-  DollarSign,
   CreditCard,
   Banknote,
   Smartphone,
@@ -201,11 +200,10 @@ export function CashierPage() {
               <div
                 key={order.id}
                 onClick={() => handleTakeOrder(order)}
-                className={`card cursor-pointer hover:shadow-md transition-shadow ${
-                  selectedOrder?.id === order.id
+                className={`card cursor-pointer hover:shadow-md transition-shadow ${selectedOrder?.id === order.id
                     ? 'ring-2 ring-primary-500'
                     : ''
-                }`}
+                  }`}
               >
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -331,11 +329,10 @@ export function CashierPage() {
                 <button
                   key={method.id}
                   onClick={() => setPaymentMethod(method.id)}
-                  className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${
-                    paymentMethod === method.id
+                  className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${paymentMethod === method.id
                       ? 'border-primary-500 bg-primary-50'
                       : 'border-gray-200'
-                  }`}
+                    }`}
                 >
                   <method.icon className="w-6 h-6" />
                   <span className="text-xs">{method.label}</span>
