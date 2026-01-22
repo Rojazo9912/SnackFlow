@@ -11,6 +11,7 @@ interface Product {
   price: number;
   stock: number;
   is_favorite: boolean;
+  is_composite: boolean;
   categories: { id: string; name: string } | null;
 }
 
@@ -46,7 +47,7 @@ export function SalesPage() {
   const loadData = async () => {
     try {
       const [productsData, categoriesData] = await Promise.all([
-        productsApi.getAll(),
+        productsApi.getAll({ calculateCompositeStock: true }),
         categoriesApi.getAll(),
       ]);
       setProducts(productsData);
@@ -202,7 +203,8 @@ export function SalesPage() {
                         ? 'bg-orange-50 text-orange-600'
                         : 'bg-gray-100 text-gray-500'
                       }`}>
-                      {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
+                      {product.is_composite ? 'Receta: ' : 'Stock: '}
+                      {product.stock <= 0 ? 'Sin stock' : product.stock}
                     </span>
                     <div className="bg-primary-50 p-1.5 rounded-lg group-hover:bg-primary-500 group-hover:text-white transition-colors duration-200">
                       <Plus className="w-4 h-4" />

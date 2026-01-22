@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Edit, Star, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { productsApi, categoriesApi } from '../services/api';
+import { RecipeEditor } from '../components/RecipeEditor';
 
 interface Product {
   id: string;
@@ -13,8 +14,15 @@ interface Product {
   min_stock: number;
   active: boolean;
   is_favorite: boolean;
+  is_composite: boolean;
   category_id: string;
+  unit: string;
   categories: { id: string; name: string } | null;
+}
+
+interface Ingredient {
+  ingredientId: string;
+  quantity: number;
 }
 
 interface Category {
@@ -39,7 +47,10 @@ export function ProductsPage() {
     stock: '',
     minStock: '',
     categoryId: '',
+    isComposite: false,
+    unit: 'pieza',
   });
+  const [ingredients, setIngredients] = useState<Ingredient[]>([]);
 
   useEffect(() => {
     loadData();
@@ -77,15 +88,24 @@ export function ProductsPage() {
       stock: formData.stock ? parseInt(formData.stock) : 0,
       minStock: formData.minStock ? parseInt(formData.minStock) : undefined,
       categoryId: formData.categoryId || undefined,
+      isComposite: formData.isComposite,
+      unit: formData.unit,
     };
 
     try {
+      let productId: string;
       if (editingProduct) {
         await productsApi.update(editingProduct.id, data);
+        productId = editingProduct.id;
         toast.success('Producto actualizado');
       } else {
-        await productsApi.create(data);
+        const newProduct = await productsApi.create(data);
+        productId = newProduct.id;
         toast.success('Producto creado');
+      }
+
+      if (formData.isComposite) {
+        await productsApi.updateIngredients(productId, ingredients);
       }
       setShowModal(false);
       resetForm();
@@ -96,6 +116,10 @@ export function ProductsPage() {
   };
 
   const handleEdit = (product: Product) => {
+    handleEditSetup(product);
+  };
+
+  const handleEditSetup = async (product: Product) => {
     setEditingProduct(product);
     setFormData({
       name: product.name,
@@ -105,7 +129,20 @@ export function ProductsPage() {
       stock: product.stock?.toString() || '',
       minStock: product.min_stock?.toString() || '',
       categoryId: product.category_id || '',
+      isComposite: product.is_composite || false,
+      unit: product.unit || 'pieza',
     });
+
+    if (product.is_composite) {
+      try {
+        const ingredientsData = await productsApi.getIngredients(product.id);
+        setIngredients(ingredientsData);
+      } catch (error) {
+        toast.error('Error cargando ingredientes');
+      }
+    } else {
+      setIngredients([]);
+    }
     setShowModal(true);
   };
 
@@ -138,7 +175,10 @@ export function ProductsPage() {
       stock: '',
       minStock: '',
       categoryId: '',
+      isComposite: false,
+      unit: 'pieza',
     });
+    setIngredients([]);
   };
 
   if (loading) {
@@ -210,16 +250,14 @@ export function ProductsPage() {
                     <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleToggleFavorite(product)}
-                        className={`p-1 rounded ${
-                          product.is_favorite
-                            ? 'text-yellow-500'
-                            : 'text-gray-300 hover:text-yellow-500'
-                        }`}
+                        className={`p-1 rounded ${product.is_favorite
+                          ? 'text-yellow-500'
+                          : 'text-gray-300 hover:text-yellow-500'
+                          }`}
                       >
                         <Star
-                          className={`w-4 h-4 ${
-                            product.is_favorite ? 'fill-current' : ''
-                          }`}
+                          className={`w-4 h-4 ${product.is_favorite ? 'fill-current' : ''
+                            }`}
                         />
                       </button>
                       <div>
@@ -238,11 +276,10 @@ export function ProductsPage() {
                   </td>
                   <td className="px-4 py-3 text-right">
                     <span
-                      className={`${
-                        product.min_stock && product.stock <= product.min_stock
-                          ? 'text-red-600 font-medium'
-                          : ''
-                      }`}
+                      className={`${product.min_stock && product.stock <= product.min_stock
+                        ? 'text-red-600 font-medium'
+                        : ''
+                        }`}
                     >
                       {product.stock}
                     </span>
@@ -250,11 +287,10 @@ export function ProductsPage() {
                   <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => handleToggleActive(product)}
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        product.active
-                          ? 'bg-green-100 text-green-800'
-                          : 'bg-gray-100 text-gray-600'
-                      }`}
+                      className={`px-2 py-1 text-xs rounded-full ${product.active
+                        ? 'bg-green-100 text-green-800'
+                        : 'bg-gray-100 text-gray-600'
+                        }`}
                     >
                       {product.active ? 'Activo' : 'Inactivo'}
                     </button>
@@ -382,6 +418,32 @@ export function ProductsPage() {
                   ))}
                 </select>
               </div>
+
+              <div className="flex items-center gap-2 py-2">
+                <input
+                  type="checkbox"
+                  id="isComposite"
+                  checked={formData.isComposite}
+                  onChange={(e) =>
+                    setFormData({ ...formData, isComposite: e.target.checked })
+                  }
+                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <label htmlFor="isComposite" className="text-sm font-medium text-gray-700">
+                  Es producto compuesto (receta)
+                </label>
+              </div>
+
+              {formData.isComposite && (
+                <div className="border-t pt-4">
+                  <RecipeEditor
+                    productId={editingProduct?.id}
+                    ingredients={ingredients}
+                    onChange={setIngredients}
+                    availableProducts={products}
+                  />
+                </div>
+              )}
 
               <div className="flex gap-2 pt-4">
                 <button

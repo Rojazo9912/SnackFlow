@@ -5,7 +5,9 @@
       "Bash(git remote:*)",
       "Bash(node -e \"console.log\\(require\\(''crypto''\\).randomBytes\\(32\\).toString\\(''hex''\\)\\)\")",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Add dashboard charts, PWA support, and offline indicator\n\n- Dashboard: Add recharts with area, pie, and bar charts for sales visualization\n- PWA: Configure vite-plugin-pwa with service worker and caching strategies\n- Offline: Add OfflineIndicator component showing connection status\n- Dependencies: Add recharts and vite-plugin-pwa\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: Add dashboard charts, PWA support, and offline indicator\n\n- Dashboard: Add recharts with area, pie, and bar charts for sales visualization\n- PWA: Configure vite-plugin-pwa with service worker and caching strategies\n- Offline: Add OfflineIndicator component showing connection status\n- Dependencies: Add recharts and vite-plugin-pwa\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(dir /s \"c:\\\\Users\\\\ADMIN_SISTEMAS\\\\OneDrive - Desarrollos ROD\\\\Documentos\\\\Desarrollos\\\\SnackFlow\\\\apps\\\\web\\\\src\")",
+      "Bash(dir \"c:\\\\Users\\\\ADMIN_SISTEMAS\\\\OneDrive - Desarrollos ROD\\\\Documentos\\\\Desarrollos\\\\SnackFlow\\\\apps\\\\web\\\\src\" /B /S)"
     ]
   }
 }

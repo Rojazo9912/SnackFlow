@@ -258,9 +258,9 @@ export class OrdersService {
       throw new Error(`Error procesando pago: ${orderError.message}`);
     }
 
-    // Decrease stock for each item
+    // Decrease stock for each item (handles composite products automatically)
     for (const item of order.order_items) {
-      await this.supabase.rpc('decrease_stock', {
+      await this.supabase.rpc('decrease_composite_stock', {
         p_product_id: item.product.id,
         p_quantity: item.quantity,
         p_tenant_id: tenantId,

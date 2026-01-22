@@ -30,18 +30,21 @@ export class ProductsController {
   @ApiQuery({ name: 'search', required: false })
   @ApiQuery({ name: 'includeInactive', required: false, type: Boolean })
   @ApiQuery({ name: 'favoritesOnly', required: false, type: Boolean })
+  @ApiQuery({ name: 'calculateCompositeStock', required: false, type: Boolean })
   async findAll(
     @CurrentUser('tenantId') tenantId: string,
     @Query('categoryId') categoryId?: string,
     @Query('search') search?: string,
     @Query('includeInactive') includeInactive?: boolean,
     @Query('favoritesOnly') favoritesOnly?: boolean,
+    @Query('calculateCompositeStock') calculateCompositeStock?: boolean,
   ) {
     return this.productsService.findAll(tenantId, {
       categoryId,
       search,
       includeInactive,
       favoritesOnly,
+      calculateCompositeStock,
     });
   }
 
@@ -109,5 +112,39 @@ export class ProductsController {
     @CurrentUser('tenantId') tenantId: string,
   ) {
     return this.productsService.toggleFavorite(id, tenantId);
+  }
+
+  // ==========================================
+  // INGREDIENT ENDPOINTS (for composite products)
+  // ==========================================
+
+  @Get(':id/ingredients')
+  @ApiOperation({ summary: 'Obtener ingredientes de un producto compuesto' })
+  async getIngredients(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.productsService.getProductIngredients(tenantId, id);
+  }
+
+  @Patch(':id/ingredients')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Actualizar ingredientes de un producto compuesto' })
+  async updateIngredients(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() body: { ingredients: { ingredientId: string; quantity: number }[] },
+  ) {
+    return this.productsService.setProductIngredients(tenantId, id, body.ingredients);
+  }
+
+  @Get(':id/calculated-stock')
+  @ApiOperation({ summary: 'Obtener stock calculado de un producto compuesto' })
+  async getCalculatedStock(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    const stock = await this.productsService.calculateCompositeStock(tenantId, id);
+    return { calculatedStock: stock };
   }
 }

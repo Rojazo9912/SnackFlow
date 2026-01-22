@@ -5,9 +5,13 @@ import {
   IsOptional,
   IsUUID,
   IsBoolean,
+  IsArray,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+import { ProductIngredientDto } from './product-ingredient.dto';
 
 export class UpdateProductDto {
   @ApiPropertyOptional({ example: 'Chocolate Carlos V' })
@@ -63,4 +67,19 @@ export class UpdateProductDto {
   @IsBoolean()
   @IsOptional()
   isFavorite?: boolean;
+
+  @ApiPropertyOptional({ example: false, description: 'Si es un producto compuesto (receta)' })
+  @IsBoolean()
+  @IsOptional()
+  isComposite?: boolean;
+
+  @ApiPropertyOptional({
+    type: [ProductIngredientDto],
+    description: 'Ingredientes del producto compuesto',
+  })
+  @IsArray()
+  @IsOptional()
+  @ValidateNested({ each: true })
+  @Type(() => ProductIngredientDto)
+  ingredients?: ProductIngredientDto[];
 }

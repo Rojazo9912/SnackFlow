@@ -81,11 +81,13 @@ export const authApi = {
 
 // Products
 export const productsApi = {
-  getAll: (params?: { categoryId?: string; search?: string; favoritesOnly?: boolean }) => {
+  getAll: (params?: { categoryId?: string; search?: string; favoritesOnly?: boolean; includeInactive?: boolean; calculateCompositeStock?: boolean }) => {
     const searchParams = new URLSearchParams();
     if (params?.categoryId) searchParams.set('categoryId', params.categoryId);
     if (params?.search) searchParams.set('search', params.search);
     if (params?.favoritesOnly) searchParams.set('favoritesOnly', 'true');
+    if (params?.includeInactive) searchParams.set('includeInactive', 'true');
+    if (params?.calculateCompositeStock) searchParams.set('calculateCompositeStock', 'true');
     const query = searchParams.toString();
     return api.get<any[]>(`/products${query ? `?${query}` : ''}`);
   },
@@ -95,6 +97,10 @@ export const productsApi = {
   toggleActive: (id: string) => api.patch<any>(`/products/${id}/toggle-active`),
   toggleFavorite: (id: string) => api.patch<any>(`/products/${id}/toggle-favorite`),
   getLowStock: () => api.get<any[]>('/products/low-stock'),
+  getIngredients: (id: string) => api.get<any[]>(`/products/${id}/ingredients`),
+  updateIngredients: (id: string, ingredients: { ingredientId: string; quantity: number }[]) =>
+    api.patch<any>(`/products/${id}/ingredients`, { ingredients }),
+  getCalculatedStock: (id: string) => api.get<any>(`/products/${id}/calculated-stock`),
 };
 
 // Categories
