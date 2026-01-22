@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Calendar } from 'lucide-react';
+import { Calendar, Printer } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsApi } from '../services/api';
+import { useRef } from 'react';
+import { PrintTicket } from '../components/PrintTicket';
+import { useAuthStore } from '../stores/authStore';
 
 export function ReportsPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -9,6 +12,15 @@ export function ReportsPage() {
   const [salesByHour, setSalesByHour] = useState<any>(null);
   const [topProducts, setTopProducts] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
+  // Printing support
+  const printRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuthStore();
+
+  const handlePrint = () => {
+    if (!dailySales) return;
+    window.print();
+  };
 
   useEffect(() => {
     loadReports();
@@ -44,7 +56,7 @@ export function ReportsPage() {
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 no-print">
           <Calendar className="w-5 h-5 text-gray-400" />
           <input
             type="date"
@@ -52,6 +64,15 @@ export function ReportsPage() {
             onChange={(e) => setDate(e.target.value)}
             className="input w-auto"
           />
+          <button
+            onClick={handlePrint}
+            disabled={!dailySales}
+            className="btn-secondary flex items-center gap-2"
+            title="Imprimir resumen del dia"
+          >
+            <Printer className="w-5 h-5" />
+            <span className="hidden sm:inline">Imprimir</span>
+          </button>
         </div>
       </div>
 
@@ -166,6 +187,17 @@ export function ReportsPage() {
           )}
         </div>
       </div>
+
+      {/* Printing Component */}
+      <PrintTicket
+        ref={printRef}
+        type="report"
+        data={{
+          ...dailySales,
+          topProducts: topProducts?.products
+        }}
+        tenantName={user?.tenant?.name}
+      />
     </div>
   );
 }

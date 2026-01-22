@@ -7,8 +7,12 @@ import {
   X,
   Check,
 } from 'lucide-react';
+import { useRef } from 'react';
 import toast from 'react-hot-toast';
-import { ordersApi, cashRegisterApi } from '../services/api';
+import { ordersApi, cashRegisterApi, tenantsApi } from '../services/api';
+import { PrintTicket } from '../components/PrintTicket';
+import { Printer } from 'lucide-react';
+import { useAuthStore } from '../stores/authStore';
 
 interface Order {
   id: string;
@@ -36,6 +40,12 @@ export function CashierPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
+
+  // Printing state
+  const printRef = useRef<HTMLDivElement>(null);
+  const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
+  const [printType, setPrintType] = useState<'ticket' | 'comanda'>('ticket');
+  const { user } = useAuthStore();
 
   useEffect(() => {
     loadData();
@@ -94,6 +104,11 @@ export function CashierPage() {
         paymentMethod,
         paymentDetails
       );
+
+      // Prepare for printing
+      setOrderToPrint({ ...selectedOrder, payment_method: paymentMethod } as any);
+      setPrintType('ticket');
+
       toast.success('Pago procesado correctamente');
       setSelectedOrder(null);
       setShowPaymentModal(false);
@@ -104,6 +119,19 @@ export function CashierPage() {
     } finally {
       setProcessingPayment(false);
     }
+  };
+
+  const handlePrint = (type: 'ticket' | 'comanda', order?: Order) => {
+    const target = order || selectedOrder || orderToPrint;
+    if (!target) return;
+
+    setOrderToPrint(target);
+    setPrintType(type);
+
+    // Small delay to ensure state update and render
+    setTimeout(() => {
+      window.print();
+    }, 100);
   };
 
   const handleCancelOrder = async (orderId: string) => {
@@ -163,7 +191,7 @@ export function CashierPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)]">
+    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)] no-print">
       {/* Orders list */}
       <div className="flex-1 flex flex-col min-h-0">
         <div className="flex justify-between items-center mb-4">
@@ -201,20 +229,32 @@ export function CashierPage() {
                 key={order.id}
                 onClick={() => handleTakeOrder(order)}
                 className={`card cursor-pointer hover:shadow-md transition-shadow ${selectedOrder?.id === order.id
-                    ? 'ring-2 ring-primary-500'
-                    : ''
+                  ? 'ring-2 ring-primary-500'
+                  : ''
                   }`}
               >
-                <div className="flex justify-between items-start mb-2">
-                  <div>
+                <div className="flex justify-between items-center mb-2">
+                  <div className="flex-1">
                     <span className="text-xs text-gray-500">
                       #{order.id.slice(0, 8)}
                     </span>
                     <p className="font-medium">{order.user.name}</p>
                   </div>
-                  <span className="text-lg font-bold text-primary-600">
-                    ${order.total.toFixed(2)}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handlePrint('comanda', order);
+                      }}
+                      className="p-2 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-primary-50"
+                      title="Imprimir Comanda"
+                    >
+                      <Printer className="w-5 h-5" />
+                    </button>
+                    <span className="text-lg font-bold text-primary-600">
+                      ${order.total.toFixed(2)}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2 text-sm text-gray-500">
                   <Clock className="w-4 h-4" />
@@ -330,8 +370,8 @@ export function CashierPage() {
                   key={method.id}
                   onClick={() => setPaymentMethod(method.id)}
                   className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${paymentMethod === method.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200'
+                    ? 'border-primary-500 bg-primary-50'
+                    : 'border-gray-200'
                     }`}
                 >
                   <method.icon className="w-6 h-6" />
@@ -384,6 +424,13 @@ export function CashierPage() {
           </div>
         </div>
       )}
+      {/* Printing Component */}
+      <PrintTicket
+        ref={printRef}
+        type={printType}
+        data={orderToPrint}
+        tenantName={user?.tenant?.name}
+      />
     </div>
   );
 }
