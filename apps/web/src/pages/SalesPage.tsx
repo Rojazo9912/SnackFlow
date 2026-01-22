@@ -59,15 +59,25 @@ export function SalesPage() {
   };
 
   const filteredProducts = products.filter((p) => {
-    const matchesCategory = !selectedCategory || p.categories?.id === selectedCategory;
+    // Search filter (applies always)
     const matchesSearch =
       !search ||
       p.name.toLowerCase().includes(search.toLowerCase()) ||
       p.code?.toLowerCase().includes(search.toLowerCase());
-    return matchesCategory && matchesSearch;
-  });
 
-  const favoriteProducts = products.filter((p) => p.is_favorite);
+    if (!matchesSearch) return false;
+
+    // Category filter
+    if (selectedCategory === 'favorites') {
+      return p.is_favorite;
+    }
+
+    if (selectedCategory) {
+      return p.categories?.id === selectedCategory;
+    }
+
+    return true; // "Todos"
+  });
 
   const handleSendOrder = async () => {
     if (items.length === 0) {
@@ -120,37 +130,34 @@ export function SalesPage() {
           </div>
 
           {/* Categories */}
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+          <div className="flex gap-2 overflow-x-auto pb-4 scrollbar-hide -mx-1 px-1">
             <button
               onClick={() => setSelectedCategory(null)}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
-                !selectedCategory
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 ${!selectedCategory
+                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                }`}
             >
               Todos
             </button>
             <button
               onClick={() => setSelectedCategory('favorites')}
-              className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors flex items-center gap-1 ${
-                selectedCategory === 'favorites'
-                  ? 'bg-primary-500 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
+              className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 flex items-center gap-2 ${selectedCategory === 'favorites'
+                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                }`}
             >
-              <Star className="w-4 h-4" />
+              <Star className={`w-4 h-4 ${selectedCategory === 'favorites' ? 'fill-current' : ''}`} />
               Favoritos
             </button>
             {categories.map((cat) => (
               <button
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
-                className={`px-4 py-2 rounded-full whitespace-nowrap transition-colors ${
-                  selectedCategory === cat.id
-                    ? 'bg-primary-500 text-white'
-                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                }`}
+                className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 ${selectedCategory === cat.id
+                    ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                  }`}
               >
                 {cat.name}
               </button>
@@ -160,43 +167,55 @@ export function SalesPage() {
 
         {/* Products grid */}
         <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-            {(selectedCategory === 'favorites' ? favoriteProducts : filteredProducts).map(
-              (product) => (
-                <button
-                  key={product.id}
-                  onClick={() =>
-                    addItem({
-                      id: product.id,
-                      name: product.name,
-                      price: product.price,
-                    })
-                  }
-                  disabled={product.stock <= 0}
-                  className={`card text-left hover:shadow-md transition-shadow ${
-                    product.stock <= 0 ? 'opacity-50 cursor-not-allowed' : ''
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+            {filteredProducts.map((product: Product) => (
+              <button
+                key={product.id}
+                onClick={() =>
+                  addItem({
+                    id: product.id,
+                    name: product.name,
+                    price: product.price,
+                  })
+                }
+                disabled={product.stock <= 0}
+                className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${product.stock <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
                   }`}
-                >
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-medium text-sm line-clamp-2">
-                      {product.name}
-                    </h3>
-                    {product.is_favorite && (
-                      <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />
-                    )}
-                  </div>
-                  <p className="text-primary-600 font-bold">
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <h3 className="font-semibold text-gray-800 text-sm line-clamp-2 leading-tight group-hover:text-primary-600 transition-colors">
+                    {product.name}
+                  </h3>
+                  {product.is_favorite && (
+                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 flex-shrink-0" />
+                  )}
+                </div>
+
+                <div className="mt-auto">
+                  <p className="text-primary-600 font-bold text-lg">
                     ${product.price.toFixed(2)}
                   </p>
-                  {product.stock <= 5 && product.stock > 0 && (
-                    <p className="text-xs text-orange-500 mt-1">
-                      Stock: {product.stock}
-                    </p>
-                  )}
-                </button>
-              )
-            )}
+                  <div className="flex items-center justify-between mt-1">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${product.stock <= 0
+                        ? 'bg-red-50 text-red-600'
+                        : product.stock <= 5
+                          ? 'bg-orange-50 text-orange-600'
+                          : 'bg-gray-50 text-gray-500'
+                      }`}>
+                      {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
+                    </span>
+                    <Plus className="w-4 h-4 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  </div>
+                </div>
+              </button>
+            ))}
           </div>
+          {filteredProducts.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-12 text-gray-400">
+              <Search className="w-12 h-12 mb-2 opacity-20" />
+              <p>No se encontraron productos</p>
+            </div>
+          )}
         </div>
       </div>
 
