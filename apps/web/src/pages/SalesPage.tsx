@@ -134,8 +134,8 @@ export function SalesPage() {
             <button
               onClick={() => setSelectedCategory(null)}
               className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 ${!selectedCategory
-                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
                 }`}
             >
               Todos
@@ -143,8 +143,8 @@ export function SalesPage() {
             <button
               onClick={() => setSelectedCategory('favorites')}
               className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 flex items-center gap-2 ${selectedCategory === 'favorites'
-                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
-                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
                 }`}
             >
               <Star className={`w-4 h-4 ${selectedCategory === 'favorites' ? 'fill-current' : ''}`} />
@@ -155,8 +155,8 @@ export function SalesPage() {
                 key={cat.id}
                 onClick={() => setSelectedCategory(cat.id)}
                 className={`px-6 py-2 rounded-xl whitespace-nowrap font-medium transition-all duration-200 ${selectedCategory === cat.id
-                    ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
-                    : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
+                  ? 'bg-primary-500 text-white shadow-lg shadow-primary-200 scale-105'
+                  : 'bg-white text-gray-600 hover:bg-gray-50 border border-gray-100'
                   }`}
               >
                 {cat.name}
@@ -196,15 +196,17 @@ export function SalesPage() {
                     ${product.price.toFixed(2)}
                   </p>
                   <div className="flex items-center justify-between mt-1">
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md ${product.stock <= 0
-                        ? 'bg-red-50 text-red-600'
-                        : product.stock <= 5
-                          ? 'bg-orange-50 text-orange-600'
-                          : 'bg-gray-50 text-gray-500'
+                    <span className={`text-[10px] font-medium px-2 py-1 rounded-md ${product.stock <= 0
+                      ? 'bg-red-50 text-red-600'
+                      : product.stock <= 5
+                        ? 'bg-orange-50 text-orange-600'
+                        : 'bg-gray-100 text-gray-500'
                       }`}>
                       {product.stock <= 0 ? 'Sin stock' : `Stock: ${product.stock}`}
                     </span>
-                    <Plus className="w-4 h-4 text-primary-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="bg-primary-50 p-1.5 rounded-lg group-hover:bg-primary-500 group-hover:text-white transition-colors duration-200">
+                      <Plus className="w-4 h-4" />
+                    </div>
                   </div>
                 </div>
               </button>
@@ -241,29 +243,29 @@ export function SalesPage() {
                     ${(item.price * item.quantity).toFixed(2)}
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
                   <button
                     onClick={() =>
                       updateQuantity(item.productId, item.quantity - 1)
                     }
-                    className="p-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
                   >
-                    <Minus className="w-4 h-4" />
+                    <Minus className="w-5 h-5" />
                   </button>
-                  <span className="w-8 text-center">{item.quantity}</span>
+                  <span className="w-10 text-center font-bold text-lg">{item.quantity}</span>
                   <button
                     onClick={() =>
                       updateQuantity(item.productId, item.quantity + 1)
                     }
-                    className="p-1 rounded bg-gray-100 hover:bg-gray-200"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
                   >
-                    <Plus className="w-4 h-4" />
+                    <Plus className="w-5 h-5" />
                   </button>
                   <button
                     onClick={() => removeItem(item.productId)}
-                    className="p-1 rounded text-red-500 hover:bg-red-50"
+                    className="w-10 h-10 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50 active:scale-95 transition-transform ml-1"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-5 h-5" />
                   </button>
                 </div>
               </div>
