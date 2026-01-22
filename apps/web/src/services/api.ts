@@ -33,8 +33,11 @@ async function request<T>(
   });
 
   if (response.status === 401) {
+    const { logout } = useAuthStore.getState();
     logout();
-    window.location.href = '/login';
+    if (!window.location.pathname.includes('/login') && !endpoint.includes('/auth/login')) {
+      window.location.href = '/login';
+    }
     throw new ApiError(401, 'Sesion expirada');
   }
 
