@@ -3,22 +3,38 @@ import { forwardRef } from 'react';
 interface PrintTicketProps {
     type: 'ticket' | 'comanda' | 'report';
     data: any;
-    tenantName?: string;
+    tenant: any;
 }
 
 export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
-    ({ type, data, tenantName }, ref) => {
+    ({ type, data, tenant }, ref) => {
         if (!data) return null;
+
+        const settings = tenant?.settings || {};
 
         const renderTicket = () => (
             <div className="print-content text-black font-mono text-[12px] leading-tight w-[80mm] p-2">
                 <div className="text-center mb-4">
-                    <h1 className="text-lg font-bold uppercase">{tenantName}</h1>
-                    <p>{new Date(data.created_at).toLocaleString()}</p>
-                    <p>Ticket: #{data.id.slice(0, 8)}</p>
+                    {settings.logo && (
+                        <div className="mb-2 flex justify-center">
+                            <img src={settings.logo} alt="Logo" className="max-h-16 object-contain" />
+                        </div>
+                    )}
+                    <h1 className="text-lg font-bold uppercase">{tenant?.name}</h1>
+                    {settings.address && <p>{settings.address}</p>}
+                    {settings.phone && <p>Tel: {settings.phone}</p>}
+
+                    <div className="my-2 py-1 border-t border-b border-dashed border-black">
+                        <p className="font-bold">{new Date(data.created_at).toLocaleString()}</p>
+                        <p>Ticket: #{data.id.slice(0, 8)}</p>
+                    </div>
+
+                    {settings.ticketHeader && (
+                        <p className="mt-2 italic whitespace-pre-wrap">{settings.ticketHeader}</p>
+                    )}
                 </div>
 
-                <div className="border-t border-b border-black py-2 mb-2">
+                <div className="border-b border-black py-2 mb-2">
                     <div className="flex justify-between font-bold mb-1">
                         <span>Prod</span>
                         <div className="flex gap-4">
@@ -38,14 +54,19 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 </div>
 
                 <div className="text-right space-y-1 mb-4">
-                    <p className="text-lg font-bold">TOTAL: ${data.total.toFixed(2)}</p>
+                    <div className="flex justify-between items-center border-t border-black pt-1">
+                        <span className="font-bold">TOTAL:</span>
+                        <span className="text-lg font-bold">${data.total.toFixed(2)}</span>
+                    </div>
                     {data.payment_method && (
                         <p className="text-sm italic">Metodo: {data.payment_method}</p>
                     )}
                 </div>
 
-                <div className="text-center text-[10px] mt-4">
-                    <p>¡Gracias por su compra!</p>
+                <div className="text-center text-[10px] mt-4 space-y-1">
+                    {settings.ticketFooter && (
+                        <p className="whitespace-pre-wrap mb-2">{settings.ticketFooter}</p>
+                    )}
                     <p>SnackFlow POS</p>
                 </div>
             </div>
@@ -89,9 +110,14 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         const renderReport = () => (
             <div className="print-content text-black font-mono text-[12px] leading-tight w-[80mm] p-2">
                 <div className="text-center mb-4 border-b-2 border-black pb-2">
+                    {settings.logo && (
+                        <div className="mb-2 flex justify-center">
+                            <img src={settings.logo} alt="Logo" className="max-h-16 object-contain" />
+                        </div>
+                    )}
                     <h1 className="text-lg font-bold uppercase">REPORTE DIARIO</h1>
                     <p>{new Date().toLocaleDateString()}</p>
-                    <p>{tenantName}</p>
+                    <p>{tenant?.name}</p>
                 </div>
 
                 <div className="space-y-4">

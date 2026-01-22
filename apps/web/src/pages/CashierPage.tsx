@@ -429,7 +429,7 @@ export function CashierPage() {
         ref={printRef}
         type={printType}
         data={orderToPrint}
-        tenantName={user?.tenant?.name}
+        tenant={user?.tenant}
       />
     </div>
   );

@@ -196,7 +196,7 @@ export function ReportsPage() {
           ...dailySales,
           topProducts: topProducts?.products
         }}
-        tenantName={user?.tenant?.name}
+        tenant={user?.tenant}
       />
     </div>
   );

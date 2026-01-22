@@ -1,18 +1,24 @@
 import { useEffect, useState } from 'react';
-import { Save } from 'lucide-react';
+import { Save, Upload, X } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { tenantsApi } from '../services/api';
+import { tenantsApi, filesApi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
 
 export function SettingsPage() {
   const [tenant, setTenant] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const updateUser = useAuthStore((state) => state.updateUser);
 
   const [formData, setFormData] = useState({
     name: '',
     slug: '',
+    address: '',
+    phone: '',
+    logo: '',
+    ticketHeader: '',
+    ticketFooter: '',
   });
 
   useEffect(() => {
@@ -26,6 +32,11 @@ export function SettingsPage() {
       setFormData({
         name: data.name,
         slug: data.slug,
+        address: data.settings?.address || '',
+        phone: data.settings?.phone || '',
+        logo: data.settings?.logo || '',
+        ticketHeader: data.settings?.ticketHeader || '',
+        ticketFooter: data.settings?.ticketFooter || '',
       });
     } catch (error) {
       toast.error('Error cargando configuracion');
@@ -39,7 +50,18 @@ export function SettingsPage() {
     setSaving(true);
 
     try {
-      const updated = await tenantsApi.update(formData);
+      const { address, phone, logo, ticketHeader, ticketFooter, ...tenantData } = formData;
+      const updated = await tenantsApi.update({
+        ...tenantData,
+        settings: {
+          ...tenant.settings,
+          address,
+          phone,
+          logo,
+          ticketHeader,
+          ticketFooter,
+        }
+      });
       setTenant(updated);
       updateUser({ tenant: updated });
       toast.success('Configuracion guardada');
@@ -47,6 +69,22 @@ export function SettingsPage() {
       toast.error(error.message || 'Error guardando configuracion');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const { url } = await filesApi.uploadLogo(file);
+      setFormData({ ...formData, logo: url });
+      toast.success('Logo subido correctamente');
+    } catch (error: any) {
+      toast.error(error.message || 'Error subiendo logo');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -100,6 +138,98 @@ export function SettingsPage() {
             <p className="text-sm text-gray-500 mt-1">
               URL: {formData.slug}.snackflow.app
             </p>
+          </div>
+
+          <div className="border-t pt-4 mt-6">
+            <h2 className="font-semibold mb-4">Personalización de Tickets</h2>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium mb-2">Logo del Negocio</label>
+              <div className="flex items-center gap-4">
+                <div className="relative w-24 h-24 border-2 border-dashed border-gray-300 rounded-xl flex items-center justify-center overflow-hidden bg-gray-50 group">
+                  {formData.logo ? (
+                    <>
+                      <img src={formData.logo} alt="Logo preview" className="w-full h-full object-contain" />
+                      <button
+                        type="button"
+                        onClick={() => setFormData({ ...formData, logo: '' })}
+                        className="absolute inset-0 bg-black/50 text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"
+                      >
+                        <X className="w-6 h-6" />
+                      </button>
+                    </>
+                  ) : (
+                    <Upload className="w-8 h-8 text-gray-400" />
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    id="logo-upload"
+                    className="hidden"
+                    accept="image/*"
+                    onChange={handleLogoUpload}
+                    disabled={uploading}
+                  />
+                  <label
+                    htmlFor="logo-upload"
+                    className={`btn-secondary text-sm cursor-pointer inline-flex items-center gap-2 ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                  >
+                    <Upload className="w-4 h-4" />
+                    {uploading ? 'Subiendo...' : 'Seleccionar imagen'}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">
+                    PNG o JPG, máx. 2MB. Se recomienda fondo blanco.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Dirección</label>
+                <input
+                  type="text"
+                  value={formData.address}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="input"
+                  placeholder="Calle, Ciudad, CP"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Teléfono</label>
+                <input
+                  type="text"
+                  value={formData.phone}
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  className="input"
+                  placeholder="+52 ..."
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Encabezado de Ticket</label>
+                <input
+                  type="text"
+                  value={formData.ticketHeader}
+                  onChange={(e) => setFormData({ ...formData, ticketHeader: e.target.value })}
+                  className="input"
+                  placeholder="¡Gracias por visitarnos!"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Pie de Ticket</label>
+                <input
+                  type="text"
+                  value={formData.ticketFooter}
+                  onChange={(e) => setFormData({ ...formData, ticketFooter: e.target.value })}
+                  className="input"
+                  placeholder="Síguenos en @redes_sociales"
+                />
+              </div>
+            </div>
           </div>
 
           <div className="pt-4">

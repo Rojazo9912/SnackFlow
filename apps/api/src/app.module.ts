@@ -11,6 +11,7 @@ import { InventoryModule } from './modules/inventory/inventory.module';
 import { CashRegisterModule } from './modules/cash-register/cash-register.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
+import { FilesModule } from './modules/files/files.module';
 
 @Module({
   imports: [
@@ -29,6 +30,7 @@ import { HealthModule } from './modules/health/health.module';
     InventoryModule,
     CashRegisterModule,
     ReportsModule,
+    FilesModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }

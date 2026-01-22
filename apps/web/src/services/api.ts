@@ -188,3 +188,27 @@ export const tenantsApi = {
   updateSettings: (settings: any) =>
     api.patch<any>('/tenants/current/settings', settings),
 };
+
+// Files
+export const filesApi = {
+  uploadLogo: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const { accessToken } = useAuthStore.getState();
+    const response = await fetch(`${API_URL}/files/upload-logo`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      throw new ApiError(response.status, data.message || 'Error subiendo logo');
+    }
+
+    return response.json() as Promise<{ url: string }>;
+  },
+};
