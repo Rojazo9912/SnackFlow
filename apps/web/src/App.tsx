@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
 import { Layout } from './components/Layout';
+import { OfflineIndicator } from './components/OfflineIndicator';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
@@ -19,7 +20,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
 function App() {
   return (
-    <Routes>
+    <>
+      <OfflineIndicator />
+      <Routes>
       <Route path="/login" element={<LoginPage />} />
       <Route
         path="/"
@@ -41,6 +44,7 @@ function App() {
         <Route path="settings" element={<SettingsPage />} />
       </Route>
     </Routes>
+    </>
   );
 }
 
