@@ -10,7 +10,7 @@ export class ProductsService {
   constructor(
     @Inject(SUPABASE_CLIENT)
     private readonly supabase: SupabaseClient,
-  ) {}
+  ) { }
 
   async findAll(
     tenantId: string,
@@ -327,8 +327,8 @@ export class ProductsService {
         await this.validateNoCircularReference(
           tenantId,
           productId,
-          subIngredients.map((si: { ingredient: { id: string }; quantity: number }) => ({
-            ingredientId: si.ingredient.id,
+          subIngredients.map((si: any) => ({
+            ingredientId: si.ingredient?.id || si.ingredient?.[0]?.id,
             quantity: si.quantity,
           })),
           new Set(visited),
