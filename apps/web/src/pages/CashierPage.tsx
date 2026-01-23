@@ -15,6 +15,8 @@ import { Printer } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../utils/notifications';
 
 interface Order {
   id: string;
@@ -51,10 +53,33 @@ export function CashierPage() {
 
   useEffect(() => {
     loadData();
+    // Request notification permission on mount
+    requestNotificationPermission();
     // Poll for new orders every 5 seconds
     const interval = setInterval(loadOrders, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  // Realtime notifications for new orders
+  useRealtimeNotifications({
+    enabled: !!cashSession,
+    onNewOrder: (order) => {
+      console.log('New order notification:', order);
+      // Play sound
+      playNotificationSound();
+      // Show toast
+      showToast.info(`Nuevo pedido de ${order.user?.name || 'Cliente'}`, {
+        duration: 5000,
+      });
+      // Show browser notification
+      showBrowserNotification('Nuevo Pedido', {
+        body: `Pedido #${order.id.slice(0, 8)} - Total: $${order.total}`,
+        tag: order.id,
+      });
+      // Refresh orders list
+      loadOrders();
+    },
+  });
 
   const loadData = async () => {
     try {
