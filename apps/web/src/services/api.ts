@@ -233,6 +233,7 @@ export const usersApi = {
 
 // Tenants
 export const tenantsApi = {
+  getPublic: (slug: string) => api.get<any>(`/tenants/public/${slug}`),
   getCurrent: () => api.get<any>('/tenants/current'),
   update: (data: any) => api.patch<any>('/tenants/current', data),
   getSettings: () => api.get<any>('/tenants/current/settings'),

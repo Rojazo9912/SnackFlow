@@ -1,15 +1,33 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
-import { authApi } from '../services/api';
+import { authApi, tenantsApi } from '../services/api';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [tenantInfo, setTenantInfo] = useState<any>(null);
   const login = useAuthStore((state) => state.login);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    loadTenantInfo();
+  }, []);
+
+  const loadTenantInfo = async () => {
+    try {
+      // Get slug from subdomain or use default 'demo'
+      const hostname = window.location.hostname;
+      const slug = hostname.includes('localhost') ? 'demo' : hostname.split('.')[0];
+      const info = await tenantsApi.getPublic(slug);
+      setTenantInfo(info);
+    } catch (error) {
+      console.error('Error loading tenant info:', error);
+      // Continue without logo if tenant not found
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +51,18 @@ export function LoginPage() {
         <div className="bg-white rounded-2xl shadow-xl p-8">
           {/* Logo */}
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-primary-600">SnackFlow</h1>
+            {tenantInfo?.logo && (
+              <div className="mb-4 flex justify-center">
+                <img
+                  src={tenantInfo.logo}
+                  alt={tenantInfo.name || 'Logo'}
+                  className="h-24 w-auto object-contain"
+                />
+              </div>
+            )}
+            <h1 className="text-3xl font-bold text-primary-600">
+              {tenantInfo?.name || 'SnackFlow'}
+            </h1>
             <p className="text-gray-500 mt-2">Sistema de Punto de Venta</p>
           </div>
 

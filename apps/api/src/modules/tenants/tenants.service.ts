@@ -8,7 +8,7 @@ export class TenantsService {
   constructor(
     @Inject(SUPABASE_CLIENT)
     private readonly supabase: SupabaseClient,
-  ) {}
+  ) { }
 
   async findOne(id: string) {
     const { data, error } = await this.supabase
@@ -57,5 +57,24 @@ export class TenantsService {
     }
 
     return data.settings;
+  }
+
+  async findBySlug(slug: string) {
+    const { data, error } = await this.supabase
+      .from('tenants')
+      .select('id, name, slug, settings')
+      .eq('slug', slug)
+      .single();
+
+    if (error || !data) {
+      throw new NotFoundException('Tenant no encontrado');
+    }
+
+    // Return only public information
+    return {
+      name: data.name,
+      slug: data.slug,
+      logo: data.settings?.logo || null,
+    };
   }
 }
