@@ -86,7 +86,7 @@ export function LoginPage() {
         </div>
 
         <p className="text-center text-white/80 text-sm mt-6">
-          &copy; 2024 SnackFlow. Todos los derechos reservados.
+          &copy; 2026 SnackFlow. Todos los derechos reservados.
         </p>
       </div>
     </div>
