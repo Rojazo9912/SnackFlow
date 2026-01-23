@@ -196,7 +196,7 @@ export function SettingsPage() {
                     {uploading ? 'Subiendo...' : 'Seleccionar imagen'}
                   </label>
                   <p className="text-xs text-gray-500 mt-2">
-                    PNG o JPG, máx. 2MB. Se recomienda fondo blanco.
+                    PNG o JPG, máx. 10MB. Se recomienda fondo transparente o blanco.
                   </p>
                 </div>
               </div>
