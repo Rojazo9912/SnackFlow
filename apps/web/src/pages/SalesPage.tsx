@@ -317,5 +317,6 @@ export function SalesPage() {
           </div>
         </div>
       </div>
-      );
+    </div>
+  );
 }
