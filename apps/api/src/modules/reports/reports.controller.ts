@@ -69,11 +69,12 @@ export class ReportsController {
     @Query('date') date?: string,
     @Query('format') format: 'excel' | 'pdf' = 'excel',
   ) {
-    const buffer =
+    const rawBuffer =
       format === 'pdf'
         ? await this.reportsService.generateDailySalesReportPDF(tenantId, date)
         : await this.reportsService.generateDailySalesReportExcel(tenantId, date);
 
+    const buffer = Buffer.from(rawBuffer as ArrayBuffer);
     const filename = `ventas_${date || new Date().toISOString().split('T')[0]}`;
     const contentType =
       format === 'pdf'
@@ -100,11 +101,13 @@ export class ReportsController {
     @Query('days') days?: number,
     @Query('format') format: 'excel' | 'pdf' = 'excel',
   ) {
-    // Only Excel for now for Top Products to keep it simple, or add PDF if requested
-    const buffer = await this.reportsService.generateTopProductsReportExcel(
+    // Only Excel for now for Top Products to keep it simple
+    const rawBuffer = await this.reportsService.generateTopProductsReportExcel(
       tenantId,
       days,
     );
+
+    const buffer = Buffer.from(rawBuffer as ArrayBuffer);
 
     res.set({
       'Content-Type':
