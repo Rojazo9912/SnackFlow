@@ -11,7 +11,14 @@
       "Bash(pnpm install:*)",
       "Bash(pnpm run build:*)",
       "Bash(pnpm build:*)",
-      "Bash(npx cap:*)"
+      "Bash(npx cap:*)",
+      "Bash(git commit:*)",
+      "Bash(copy LOGO.png appswebpubliclogo.png)",
+      "Bash(copy LOGO.png appswebandroidappsrcmainresmipmap-mdpiic_launcher.png)",
+      "Bash(copy LOGO.png appswebandroidappsrcmainresmipmap-hdpiic_launcher.png)",
+      "Bash(copy LOGO.png appswebandroidappsrcmainresmipmap-xhdpiic_launcher.png)",
+      "Bash(copy LOGO.png appswebandroidappsrcmainresmipmap-xxhdpiic_launcher.png)",
+      "Bash(copy LOGO.png appswebandroidappsrcmainresmipmap-xxxhdpiic_launcher.png)"
     ]
   }
 }
