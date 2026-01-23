@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { AlertTriangle, Plus, Minus, Trash2 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { inventoryApi, productsApi } from '../services/api';
+import { Header } from '../components/Header';
+import { EmptyState } from '../components/EmptyState';
 
 interface LowStockProduct {
   id: string;
@@ -51,7 +53,7 @@ export function InventoryPage() {
       setMovements(movementsData);
       setProducts(productsData);
     } catch (error) {
-      toast.error('Error cargando datos');
+      showToast.error('Error cargando datos');
     } finally {
       setLoading(false);
     }
@@ -67,14 +69,14 @@ export function InventoryPage() {
         parseInt(quantity),
         reason
       );
-      toast.success('Stock ajustado correctamente');
+      showToast.success('Stock ajustado correctamente');
       setShowAdjustModal(false);
       setSelectedProduct('');
       setQuantity('');
       setReason('');
       loadData();
     } catch (error: any) {
-      toast.error(error.message || 'Error ajustando stock');
+      showToast.error(error.message || 'Error ajustando stock');
     }
   };
 
@@ -104,16 +106,19 @@ export function InventoryPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold text-gray-900">Inventario</h1>
-        <button
-          onClick={() => setShowAdjustModal(true)}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Ajustar Stock
-        </button>
-      </div>
+      <Header
+        title="Inventario"
+        subtitle={`${lowStock.length} productos con stock bajo`}
+        actions={
+          <button
+            onClick={() => setShowAdjustModal(true)}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Ajustar Stock
+          </button>
+        }
+      />
 
       {/* Low stock alert */}
       {lowStock.length > 0 && (
@@ -209,9 +214,10 @@ export function InventoryPage() {
           </table>
 
           {movements.length === 0 && (
-            <p className="text-center text-gray-500 py-8">
-              No hay movimientos registrados
-            </p>
+            <EmptyState
+              title="No hay movimientos"
+              description="Los movimientos de inventario aparecerán aquí"
+            />
           )}
         </div>
       </div>
@@ -259,8 +265,8 @@ export function InventoryPage() {
                       type="button"
                       onClick={() => setAdjustType(type.id as any)}
                       className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 ${adjustType === type.id
-                          ? `border-${type.color}-500 bg-${type.color}-50`
-                          : 'border-gray-200'
+                        ? `border-${type.color}-500 bg-${type.color}-50`
+                        : 'border-gray-200'
                         }`}
                     >
                       <type.icon className="w-5 h-5" />

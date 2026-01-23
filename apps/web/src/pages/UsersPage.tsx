@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Edit, Key } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { usersApi } from '../services/api';
+import { Header } from '../components/Header';
+import { EmptyState } from '../components/EmptyState';
 
 interface User {
   id: string;
@@ -35,7 +37,7 @@ export function UsersPage() {
       const data = await usersApi.getAll();
       setUsers(data);
     } catch (error) {
-      toast.error('Error cargando usuarios');
+      showToast.error('Error cargando usuarios');
     } finally {
       setLoading(false);
     }
@@ -50,41 +52,41 @@ export function UsersPage() {
           name: formData.name,
           role: formData.role,
         });
-        toast.success('Usuario actualizado');
+        showToast.success('Usuario actualizado');
       } else {
         await usersApi.create(formData);
-        toast.success('Usuario creado');
+        showToast.success('Usuario creado');
       }
       setShowModal(false);
       resetForm();
       loadUsers();
     } catch (error: any) {
-      toast.error(error.message || 'Error guardando usuario');
+      showToast.error(error.message || 'Error guardando usuario');
     }
   };
 
   const handleToggleActive = async (user: User) => {
     try {
       await usersApi.toggleActive(user.id);
-      toast.success(user.active ? 'Usuario desactivado' : 'Usuario activado');
+      showToast.success(user.active ? 'Usuario desactivado' : 'Usuario activado');
       loadUsers();
     } catch (error: any) {
-      toast.error(error.message || 'Error cambiando estado');
+      showToast.error(error.message || 'Error cambiando estado');
     }
   };
 
   const handleUpdatePin = async (user: User) => {
-    const pin = prompt('Nuevo PIN (4-6 digitos):');
+    const pin = prompt('Nuevo PIN (4-6 digitos:');
     if (!pin || pin.length < 4 || pin.length > 6) {
-      toast.error('PIN invalido');
+      showToast.error('PIN invalido');
       return;
     }
 
     try {
       await usersApi.updatePin(user.id, pin);
-      toast.success('PIN actualizado');
+      showToast.success('PIN actualizado');
     } catch (error: any) {
-      toast.error(error.message || 'Error actualizando PIN');
+      showToast.error(error.message || 'Error actualizando PIN');
     }
   };
 
@@ -119,19 +121,22 @@ export function UsersPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Usuarios</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Usuario
-        </button>
-      </div>
+      <Header
+        title="Usuarios"
+        subtitle={`${users.length} usuarios registrados`}
+        actions={
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Usuario
+          </button>
+        }
+      />
 
       <div className="card overflow-hidden">
         <div className="overflow-x-auto">
@@ -166,11 +171,10 @@ export function UsersPage() {
                   <td className="px-4 py-3 text-center">
                     <button
                       onClick={() => handleToggleActive(user)}
-                      className={`px-2 py-1 text-xs rounded-full ${
-                        user.active
+                      className={`px-2 py-1 text-xs rounded-full ${user.active
                           ? 'bg-green-100 text-green-800'
                           : 'bg-gray-100 text-gray-600'
-                      }`}
+                        }`}
                     >
                       {user.active ? 'Activo' : 'Inactivo'}
                     </button>

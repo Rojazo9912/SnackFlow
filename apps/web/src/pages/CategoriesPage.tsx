@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Edit, GripVertical } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { categoriesApi } from '../services/api';
+import { Header } from '../components/Header';
+import { EmptyState } from '../components/EmptyState';
 
 interface Category {
   id: string;
@@ -26,7 +28,7 @@ export function CategoriesPage() {
       const data = await categoriesApi.getAll(true);
       setCategories(data);
     } catch (error) {
-      toast.error('Error cargando categorias');
+      showToast.error('Error cargando categorias');
     } finally {
       setLoading(false);
     }
@@ -38,29 +40,29 @@ export function CategoriesPage() {
     try {
       if (editingCategory) {
         await categoriesApi.update(editingCategory.id, { name });
-        toast.success('Categoria actualizada');
+        showToast.success('Categoria actualizada');
       } else {
         await categoriesApi.create({ name });
-        toast.success('Categoria creada');
+        showToast.success('Categoria creada');
       }
       setShowModal(false);
       setName('');
       setEditingCategory(null);
       loadCategories();
     } catch (error: any) {
-      toast.error(error.message || 'Error guardando categoria');
+      showToast.error(error.message || 'Error guardando categoria');
     }
   };
 
   const handleToggleActive = async (category: Category) => {
     try {
       await categoriesApi.toggleActive(category.id);
-      toast.success(
+      showToast.success(
         category.active ? 'Categoria desactivada' : 'Categoria activada'
       );
       loadCategories();
     } catch (error: any) {
-      toast.error(error.message || 'Error cambiando estado');
+      showToast.error(error.message || 'Error cambiando estado');
     }
   };
 
@@ -74,29 +76,31 @@ export function CategoriesPage() {
 
   return (
     <div>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Categorias</h1>
-        <button
-          onClick={() => {
-            setEditingCategory(null);
-            setName('');
-            setShowModal(true);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nueva Categoria
-        </button>
-      </div>
+      <Header
+        title="Categorías"
+        subtitle={`${categories.length} categorías registradas`}
+        actions={
+          <button
+            onClick={() => {
+              setEditingCategory(null);
+              setName('');
+              setShowModal(true);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nueva Categoria
+          </button>
+        }
+      />
 
       <div className="card">
         <div className="space-y-2">
           {categories.map((category) => (
             <div
               key={category.id}
-              className={`flex items-center justify-between p-4 rounded-lg border ${
-                !category.active ? 'bg-gray-50' : 'bg-white'
-              }`}
+              className={`flex items-center justify-between p-4 rounded-lg border ${!category.active ? 'bg-gray-50' : 'bg-white'
+                }`}
             >
               <div className="flex items-center gap-3">
                 <GripVertical className="w-5 h-5 text-gray-400 cursor-grab" />
@@ -106,11 +110,10 @@ export function CategoriesPage() {
               <div className="flex items-center gap-2">
                 <button
                   onClick={() => handleToggleActive(category)}
-                  className={`px-3 py-1 text-xs rounded-full ${
-                    category.active
+                  className={`px-3 py-1 text-xs rounded-full ${category.active
                       ? 'bg-green-100 text-green-800'
                       : 'bg-gray-100 text-gray-600'
-                  }`}
+                    }`}
                 >
                   {category.active ? 'Activa' : 'Inactiva'}
                 </button>
@@ -129,9 +132,18 @@ export function CategoriesPage() {
           ))}
 
           {categories.length === 0 && (
-            <p className="text-center text-gray-500 py-8">
-              No hay categorias registradas
-            </p>
+            <EmptyState
+              title="No hay categorías"
+              description="Crea tu primera categoría para organizar tus productos"
+              action={{
+                label: "Nueva Categoría",
+                onClick: () => {
+                  setEditingCategory(null);
+                  setName('');
+                  setShowModal(true);
+                }
+              }}
+            />
           )}
         </div>
       </div>

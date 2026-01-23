@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Calendar, Printer, FileSpreadsheet, FileText } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { reportsApi } from '../services/api';
 import { useRef } from 'react';
 import { PrintTicket } from '../components/PrintTicket';
 import { useAuthStore } from '../stores/authStore';
+import { Header } from '../components/Header';
 
 export function ReportsPage() {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -24,28 +25,28 @@ export function ReportsPage() {
 
   const handleExportExcel = async () => {
     try {
-      await reportsApi.exportDailySales({ date, format: 'excel' });
-      toast.success('Reporte Excel generado');
+    \n      await reportsApi.exportDailySales({ date, format: 'excel' });
+      showToast.success('Reporte Excel generado');
     } catch (error) {
-      toast.error('Error exportando a Excel');
+      showToast.error('Error exportando a Excel');
     }
   };
 
   const handleExportPdf = async () => {
     try {
       await reportsApi.exportDailySales({ date, format: 'pdf' });
-      toast.success('Reporte PDF generado');
+      showToast.success('Reporte PDF generado');
     } catch (error) {
-      toast.error('Error exportando a PDF');
+      showToast.error('Error exportando a PDF');
     }
   };
 
   const handleExportTopProducts = async () => {
     try {
       await reportsApi.exportTopProducts({ days: 7 });
-      toast.success('Reporte de productos generado');
+      showToast.success('Reporte de productos generado');
     } catch (error) {
-      toast.error('Error exportando reporte');
+      showToast.error('Error exportando reporte');
     }
   };
 
@@ -65,7 +66,7 @@ export function ReportsPage() {
       setSalesByHour(byHour);
       setTopProducts(top);
     } catch (error) {
-      toast.error('Error cargando reportes');
+      showToast.error('Error cargando reportes');
     } finally {
       setLoading(false);
     }
@@ -81,43 +82,46 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <h1 className="text-2xl font-bold text-gray-900">Reportes</h1>
-        <div className="flex items-center gap-2 no-print">
-          <Calendar className="w-5 h-5 text-gray-400" />
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="input w-auto"
-          />
-          <button
-            onClick={handlePrint}
-            disabled={!dailySales}
-            className="btn-secondary flex items-center gap-2"
-            title="Imprimir resumen del dia"
-          >
-            <Printer className="w-5 h-5" />
-            <span className="hidden sm:inline">Imprimir</span>
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="btn-secondary flex items-center gap-2 text-green-600 border-green-200 hover:bg-green-50"
-            title="Exportar a Excel"
-          >
-            <FileSpreadsheet className="w-5 h-5" />
-            <span className="hidden sm:inline">Excel</span>
-          </button>
-          <button
-            onClick={handleExportPdf}
-            className="btn-secondary flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
-            title="Exportar a PDF"
-          >
-            <FileText className="w-5 h-5" />
-            <span className="hidden sm:inline">PDF</span>
-          </button>
-        </div>
-      </div>
+      <Header
+        title="Reportes"
+        subtitle={new Date(date).toLocaleDateString('es-MX', { dateStyle: 'long' })}
+        actions={
+          <div className="flex items-center gap-2 no-print">
+            <Calendar className="w-5 h-5 text-gray-400" />
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="input w-auto"
+            />
+            <button
+              onClick={handlePrint}
+              disabled={!dailySales}
+              className="btn-secondary flex items-center gap-2"
+              title="Imprimir resumen del dia"
+            >
+              <Printer className="w-5 h-5" />
+              <span className="hidden sm:inline">Imprimir</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="btn-secondary flex items-center gap-2 text-green-600 border-green-200 hover:bg-green-50"
+              title="Exportar a Excel"
+            >
+              <FileSpreadsheet className="w-5 h-5" />
+              <span className="hidden sm:inline">Excel</span>
+            </button>
+            <button
+              onClick={handleExportPdf}
+              className="btn-secondary flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+              title="Exportar a PDF"
+            >
+              <FileText className="w-5 h-5" />
+              <span className="hidden sm:inline">PDF</span>
+            </button>
+          </div>
+        }
+      />
 
       {/* Daily summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
