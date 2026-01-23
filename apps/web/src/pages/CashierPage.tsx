@@ -219,6 +219,7 @@ export function CashierPage() {
         }
       />
 
+
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 no-print">
         {/* Orders list */}
         <div className="flex-1 flex flex-col min-h-0">
@@ -462,5 +463,6 @@ export function CashierPage() {
           tenant={user?.tenant}
         />
       </div>
-      );
+    </div>
+  );
 }
