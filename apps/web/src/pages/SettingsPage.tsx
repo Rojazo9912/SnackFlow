@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Save, Upload, X } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { tenantsApi, filesApi } from '../services/api';
 import { useAuthStore } from '../stores/authStore';
+import { Header } from '../components/Header';
+import { useKeyboardShortcuts } from '../hooks/useKeyboardShortcuts';
 
 export function SettingsPage() {
   const [tenant, setTenant] = useState<any>(null);
@@ -39,11 +41,23 @@ export function SettingsPage() {
         ticketFooter: data.settings?.ticketFooter || '',
       });
     } catch (error) {
-      toast.error('Error cargando configuracion');
+      showToast.error('Error cargando configuracion');
     } finally {
       setLoading(false);
     }
   };
+
+  useKeyboardShortcuts([
+    {
+      key: 's',
+      ctrl: true,
+      handler: () => {
+        const form = document.querySelector('form');
+        if (form) form.requestSubmit();
+      },
+      description: 'Guardar configuración'
+    }
+  ]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -64,9 +78,9 @@ export function SettingsPage() {
       });
       setTenant(updated);
       updateUser({ tenant: updated });
-      toast.success('Configuracion guardada');
+      showToast.success('Configuracion guardada');
     } catch (error: any) {
-      toast.error(error.message || 'Error guardando configuracion');
+      showToast.error(error.message || 'Error guardando configuracion');
     } finally {
       setSaving(false);
     }
@@ -80,9 +94,9 @@ export function SettingsPage() {
     try {
       const { url } = await filesApi.uploadLogo(file);
       setFormData({ ...formData, logo: url });
-      toast.success('Logo subido correctamente');
+      showToast.success('Logo subido correctamente');
     } catch (error: any) {
-      toast.error(error.message || 'Error subiendo logo');
+      showToast.error(error.message || 'Error subiendo logo');
     } finally {
       setUploading(false);
     }
@@ -98,7 +112,10 @@ export function SettingsPage() {
 
   return (
     <div className="max-w-2xl">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Configuracion</h1>
+      <Header
+        title="Configuración"
+        subtitle="Personaliza tu negocio"
+      />
 
       <div className="card">
         <h2 className="font-semibold mb-4">Informacion del Negocio</h2>

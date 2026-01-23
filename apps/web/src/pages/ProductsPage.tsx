@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus, Edit, Star, Search } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { Plus, Edit, Star, Search, Trash2 } from 'lucide-react';
+import { showToast } from '../utils/toast';
 import { productsApi, categoriesApi } from '../services/api';
 import { RecipeEditor } from '../components/RecipeEditor';
+import { Header } from '../components/Header';
+import { ConfirmDialog } from '../components/ConfirmDialog';
+import { EmptyState } from '../components/EmptyState';
 
 interface Product {
   id: string;
@@ -37,6 +40,8 @@ export function ProductsPage() {
   const [search, setSearch] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
 
   // Form state
   const [formData, setFormData] = useState({
@@ -65,7 +70,7 @@ export function ProductsPage() {
       setProducts(productsData);
       setCategories(categoriesData);
     } catch (error) {
-      toast.error('Error cargando datos');
+      showToast.error('Error cargando datos');
     } finally {
       setLoading(false);
     }
@@ -97,11 +102,11 @@ export function ProductsPage() {
       if (editingProduct) {
         await productsApi.update(editingProduct.id, data);
         productId = editingProduct.id;
-        toast.success('Producto actualizado');
+        showToast.success('Producto actualizado');
       } else {
         const newProduct = await productsApi.create(data);
         productId = newProduct.id;
-        toast.success('Producto creado');
+        showToast.success('Producto creado');
       }
 
       if (formData.isComposite) {
@@ -111,7 +116,7 @@ export function ProductsPage() {
       resetForm();
       loadData();
     } catch (error: any) {
-      toast.error(error.message || 'Error guardando producto');
+      showToast.error(error.message || 'Error guardando producto');
     }
   };
 
@@ -138,7 +143,7 @@ export function ProductsPage() {
         const ingredientsData = await productsApi.getIngredients(product.id);
         setIngredients(ingredientsData);
       } catch (error) {
-        toast.error('Error cargando ingredientes');
+        showToast.error('Error cargando ingredientes');
       }
     } else {
       setIngredients([]);
@@ -149,10 +154,10 @@ export function ProductsPage() {
   const handleToggleActive = async (product: Product) => {
     try {
       await productsApi.toggleActive(product.id);
-      toast.success(product.active ? 'Producto desactivado' : 'Producto activado');
+      showToast.success(product.active ? 'Producto desactivado' : 'Producto activado');
       loadData();
     } catch (error: any) {
-      toast.error(error.message || 'Error cambiando estado');
+      showToast.error(error.message || 'Error cambiando estado');
     }
   };
 
@@ -161,7 +166,7 @@ export function ProductsPage() {
       await productsApi.toggleFavorite(product.id);
       loadData();
     } catch (error: any) {
-      toast.error(error.message || 'Error cambiando favorito');
+      showToast.error(error.message || 'Error cambiando favorito');
     }
   };
 
@@ -189,21 +194,44 @@ export function ProductsPage() {
     );
   }
 
+  const handleDeleteClick = (product: Product) => {
+    setProductToDelete(product);
+    setShowDeleteConfirm(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete) return;
+
+    try {
+      await productsApi.toggleActive(productToDelete.id);
+      showToast.success('Producto eliminado');
+      loadData();
+    } catch (error: any) {
+      showToast.error(error.message || 'Error eliminando producto');
+    } finally {
+      setShowDeleteConfirm(false);
+      setProductToDelete(null);
+    }
+  };
+
   return (
     <div>
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Productos</h1>
-        <button
-          onClick={() => {
-            resetForm();
-            setShowModal(true);
-          }}
-          className="btn-primary flex items-center gap-2"
-        >
-          <Plus className="w-5 h-5" />
-          Nuevo Producto
-        </button>
-      </div>
+      <Header
+        title="Productos"
+        subtitle={`${products.length} productos registrados`}
+        actions={
+          <button
+            onClick={() => {
+              resetForm();
+              setShowModal(true);
+            }}
+            className="btn-primary flex items-center gap-2"
+          >
+            <Plus className="w-5 h-5" />
+            Nuevo Producto
+          </button>
+        }
+      />
 
       <div className="mb-4">
         <div className="relative max-w-md">
@@ -244,7 +272,23 @@ export function ProductsPage() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {filteredProducts.map((product) => (
+              {filteredProducts.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-8">
+                    <EmptyState
+                      title="No hay productos"
+                      description={search ? 'No se encontraron productos con ese criterio' : 'Agrega tu primer producto para comenzar'}
+                      action={!search ? {
+                        label: "Agregar producto",
+                        onClick: () => {
+                          resetForm();
+                          setShowModal(true);
+                        }
+                      } : undefined}
+                    />
+                  </td>
+                </tr>
+              ) : filteredProducts.map((product) => (
                 <tr key={product.id} className={!product.active ? 'bg-gray-50' : ''}>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -309,12 +353,22 @@ export function ProductsPage() {
                     </button>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button
-                      onClick={() => handleEdit(product)}
-                      className="p-1 text-gray-500 hover:text-primary-600"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => handleEdit(product)}
+                        className="p-1 text-gray-500 hover:text-primary-600"
+                        title="Editar"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteClick(product)}
+                        className="p-1 text-gray-500 hover:text-red-600"
+                        title="Eliminar"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -498,6 +552,16 @@ export function ProductsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        isOpen={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        onConfirm={handleDeleteConfirm}
+        title="Eliminar producto"
+        message={`¿Estás seguro de eliminar "${productToDelete?.name}"? Esta acción se puede revertir.`}
+        variant="danger"
+        confirmText="Eliminar"
+      />
     </div>
   );
 }

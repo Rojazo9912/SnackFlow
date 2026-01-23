@@ -23,7 +23,8 @@ import {
   Cell,
 } from 'recharts';
 import { reportsApi } from '../services/api';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
+import { Header } from '../components/Header';
 
 interface DashboardData {
   dailySales: {
@@ -70,7 +71,7 @@ export function DashboardPage() {
       ]);
       setData({ ...dashboard, salesByHour: salesByHour?.byHour });
     } catch (error: any) {
-      if (!silent) toast.error('Error cargando dashboard');
+      if (!silent) showToast.error('Error cargando dashboard');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -92,12 +93,12 @@ export function DashboardPage() {
 
   const hourlyData = data?.salesByHour
     ? Object.entries(data.salesByHour)
-        .map(([hour, info]) => ({
-          hour: `${hour}:00`,
-          ventas: info.total,
-          tickets: info.count,
-        }))
-        .filter((d) => d.ventas > 0)
+      .map(([hour, info]) => ({
+        hour: `${hour}:00`,
+        ventas: info.total,
+        tickets: info.count,
+      }))
+      .filter((d) => d.ventas > 0)
     : [];
 
   const topProductsData = data?.topProducts?.slice(0, 5).map((p) => ({
@@ -108,11 +109,11 @@ export function DashboardPage() {
 
   const paymentMethodData = data?.dailySales?.byPaymentMethod
     ? Object.entries(data.dailySales.byPaymentMethod).map(([method, info], i) => ({
-        name: method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : method === 'transfer' ? 'Transferencia' : method,
-        value: info.total,
-        count: info.count,
-        fill: COLORS[i % COLORS.length],
-      }))
+      name: method === 'cash' ? 'Efectivo' : method === 'card' ? 'Tarjeta' : method === 'transfer' ? 'Transferencia' : method,
+      value: info.total,
+      count: info.count,
+      fill: COLORS[i % COLORS.length],
+    }))
     : [];
 
   const stats = [
@@ -147,27 +148,25 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-sm text-gray-500">
-            {new Date().toLocaleDateString('es-MX', {
-              weekday: 'long',
-              year: 'numeric',
-              month: 'long',
-              day: 'numeric',
-            })}
-          </p>
-        </div>
-        <button
-          onClick={() => loadDashboard()}
-          disabled={refreshing}
-          className="btn-secondary flex items-center gap-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          Actualizar
-        </button>
-      </div>
+      <Header
+        title="Dashboard"
+        subtitle={new Date().toLocaleDateString('es-MX', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
+        actions={
+          <button
+            onClick={() => loadDashboard()}
+            disabled={refreshing}
+            className="btn-secondary flex items-center gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Actualizar
+          </button>
+        }
+      />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {stats.map((stat) => (
@@ -180,9 +179,8 @@ export function DashboardPage() {
                 <p className="text-sm font-medium text-gray-500">{stat.name}</p>
                 <p className="text-2xl font-bold text-gray-900 mt-1">{stat.value}</p>
                 {stat.change && (
-                  <div className={`flex items-center gap-1 mt-1 text-sm ${
-                    stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
-                  }`}>
+                  <div className={`flex items-center gap-1 mt-1 text-sm ${stat.changeType === 'positive' ? 'text-green-600' : 'text-red-600'
+                    }`}>
                     {stat.changeType === 'positive' ? (
                       <TrendingUp className="w-4 h-4" />
                     ) : (
@@ -336,9 +334,8 @@ export function DashboardPage() {
               >
                 <div className="flex items-center gap-3">
                   <span
-                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${
-                      index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-600' : 'bg-primary-500'
-                    }`}
+                    className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold text-white ${index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : index === 2 ? 'bg-amber-600' : 'bg-primary-500'
+                      }`}
                   >
                     {index + 1}
                   </span>
