@@ -261,7 +261,14 @@ export function ProductsPage() {
                         />
                       </button>
                       <div>
-                        <p className="font-medium">{product.name}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{product.name}</p>
+                          {product.is_composite && (
+                            <span className="px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
+                              Receta
+                            </span>
+                          )}
+                        </div>
                         {product.code && (
                           <p className="text-sm text-gray-500">{product.code}</p>
                         )}
@@ -275,14 +282,20 @@ export function ProductsPage() {
                     ${product.price.toFixed(2)}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <span
-                      className={`${product.min_stock && product.stock <= product.min_stock
-                        ? 'text-red-600 font-medium'
-                        : ''
-                        }`}
-                    >
-                      {product.stock}
-                    </span>
+                    {product.is_composite ? (
+                      <span className="text-purple-600 font-medium">
+                        - <span className="text-xs text-gray-400">(calc)</span>
+                      </span>
+                    ) : (
+                      <span
+                        className={`${product.min_stock && product.stock <= product.min_stock
+                          ? 'text-red-600 font-medium'
+                          : ''
+                          }`}
+                      >
+                        {product.stock}
+                      </span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-center">
                     <button

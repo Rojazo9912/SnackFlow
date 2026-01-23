@@ -10,10 +10,16 @@ interface Product {
   code: string;
   price: number;
   stock: number;
+  calculated_stock?: number;
   is_favorite: boolean;
   is_composite: boolean;
   categories: { id: string; name: string } | null;
 }
+
+// Helper to get available stock (uses calculated_stock for composite products)
+const getAvailableStock = (product: Product): number => {
+  return product.is_composite ? (product.calculated_stock ?? 0) : product.stock;
+};
 
 interface Category {
   id: string;
@@ -179,8 +185,8 @@ export function SalesPage() {
                     price: product.price,
                   })
                 }
-                disabled={product.stock <= 0}
-                className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${product.stock <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
+                disabled={getAvailableStock(product) <= 0}
+                className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${getAvailableStock(product) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
                   }`}
               >
                 <div className="flex justify-between items-start mb-2">
@@ -197,14 +203,16 @@ export function SalesPage() {
                     ${product.price.toFixed(2)}
                   </p>
                   <div className="flex items-center justify-between mt-1">
-                    <span className={`text-[10px] font-medium px-2 py-1 rounded-md ${product.stock <= 0
+                    <span className={`text-[10px] font-medium px-2 py-1 rounded-md ${getAvailableStock(product) <= 0
                       ? 'bg-red-50 text-red-600'
-                      : product.stock <= 5
+                      : getAvailableStock(product) <= 5
                         ? 'bg-orange-50 text-orange-600'
-                        : 'bg-gray-100 text-gray-500'
+                        : product.is_composite
+                          ? 'bg-purple-50 text-purple-600'
+                          : 'bg-gray-100 text-gray-500'
                       }`}>
-                      {product.is_composite ? 'Receta: ' : 'Stock: '}
-                      {product.stock <= 0 ? 'Sin stock' : product.stock}
+                      {product.is_composite ? 'Disp: ' : 'Stock: '}
+                      {getAvailableStock(product) <= 0 ? 'Sin stock' : getAvailableStock(product)}
                     </span>
                     <div className="bg-primary-50 p-1.5 rounded-lg group-hover:bg-primary-500 group-hover:text-white transition-colors duration-200">
                       <Plus className="w-4 h-4" />
