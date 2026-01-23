@@ -25,7 +25,7 @@ export function ReportsPage() {
 
   const handleExportExcel = async () => {
     try {
-    \n      await reportsApi.exportDailySales({ date, format: 'excel' });
+      await reportsApi.exportDailySales({ date, format: 'excel' });
       showToast.success('Reporte Excel generado');
     } catch (error) {
       showToast.error('Error exportando a Excel');
