@@ -8,11 +8,13 @@ import {
   Check,
 } from 'lucide-react';
 import { useRef } from 'react';
-import toast from 'react-hot-toast';
+import { showToast } from '../utils/toast';
 import { ordersApi, cashRegisterApi, tenantsApi } from '../services/api';
 import { PrintTicket } from '../components/PrintTicket';
 import { Printer } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { Header } from '../components/Header';
+import { EmptyState } from '../components/EmptyState';
 
 interface Order {
   id: string;
@@ -63,7 +65,7 @@ export function CashierPage() {
       setOrders(ordersData);
       setCashSession(sessionData);
     } catch (error) {
-      toast.error('Error cargando datos');
+      showToast.error('Error cargando datos');
     } finally {
       setLoading(false);
     }
@@ -84,7 +86,7 @@ export function CashierPage() {
       setSelectedOrder(order);
       loadOrders();
     } catch (error: any) {
-      toast.error(error.message || 'Error tomando pedido');
+      showToast.error(error.message || 'Error tomando pedido');
     }
   };
 
@@ -109,13 +111,13 @@ export function CashierPage() {
       setOrderToPrint({ ...selectedOrder, payment_method: paymentMethod } as any);
       setPrintType('ticket');
 
-      toast.success('Pago procesado correctamente');
+      showToast.success('Pago procesado correctamente');
       setSelectedOrder(null);
       setShowPaymentModal(false);
       setAmountReceived('');
       loadOrders();
     } catch (error: any) {
-      toast.error(error.message || 'Error procesando pago');
+      showToast.error(error.message || 'Error procesando pago');
     } finally {
       setProcessingPayment(false);
     }
@@ -140,11 +142,11 @@ export function CashierPage() {
 
     try {
       await ordersApi.cancel(orderId, reason);
-      toast.success('Pedido cancelado');
+      showToast.success('Pedido cancelado');
       setSelectedOrder(null);
       loadOrders();
     } catch (error: any) {
-      toast.error(error.message || 'Error cancelando pedido');
+      showToast.error(error.message || 'Error cancelando pedido');
     }
   };
 
@@ -176,10 +178,10 @@ export function CashierPage() {
             if (!amount) return;
             try {
               await cashRegisterApi.open(parseFloat(amount));
-              toast.success('Caja abierta');
+              showToast.success('Caja abierta');
               loadData();
             } catch (error: any) {
-              toast.error(error.message || 'Error abriendo caja');
+              showToast.error(error.message || 'Error abriendo caja');
             }
           }}
           className="btn-primary"
@@ -191,246 +193,274 @@ export function CashierPage() {
   }
 
   return (
-    <div className="flex flex-col lg:flex-row gap-4 h-[calc(100vh-8rem)] no-print">
-      {/* Orders list */}
-      <div className="flex-1 flex flex-col min-h-0">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold text-gray-900">
-            Cola de Pedidos ({orders.length})
-          </h1>
+    <div className="flex flex-col h-[calc(100vh-8rem)]">
+      <Header
+        title="Caja"
+        subtitle={`${orders.length} pedidos en cola`}
+        actions={
           <button
             onClick={async () => {
               const amount = prompt('Monto final contado:');
               if (!amount) return;
               try {
                 const result = await cashRegisterApi.close(parseFloat(amount));
-                toast.success(
+                showToast.success(
                   `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
                 );
                 loadData();
               } catch (error: any) {
-                toast.error(error.message || 'Error cerrando caja');
+                showToast.error(error.message || 'Error cerrando caja');
               }
             }}
             className="btn-secondary text-sm"
           >
             Cerrar Caja
           </button>
-        </div>
+        }
+      />
 
-        <div className="flex-1 overflow-y-auto space-y-3">
-          {orders.length === 0 ? (
-            <div className="text-center py-12 text-gray-500">
-              No hay pedidos pendientes
-            </div>
-          ) : (
-            orders.map((order) => (
-              <div
-                key={order.id}
-                onClick={() => handleTakeOrder(order)}
-                className={`card cursor-pointer hover:shadow-md transition-shadow ${selectedOrder?.id === order.id
-                  ? 'ring-2 ring-primary-500'
-                  : ''
-                  }`}
-              >
-                <div className="flex justify-between items-center mb-2">
-                  <div className="flex-1">
-                    <span className="text-xs text-gray-500">
-                      #{order.id.slice(0, 8)}
-                    </span>
-                    <p className="font-medium">{order.user.name}</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handlePrint('comanda', order);
-                      }}
-                      className="p-2 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-primary-50"
-                      title="Imprimir Comanda"
-                    >
-                      <Printer className="w-5 h-5" />
-                    </button>
-                    <span className="text-lg font-bold text-primary-600">
-                      ${order.total.toFixed(2)}
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 text-sm text-gray-500">
-                  <Clock className="w-4 h-4" />
-                  {new Date(order.created_at).toLocaleTimeString()}
-                </div>
-                <div className="mt-2 text-sm">
-                  {order.order_items.slice(0, 3).map((item) => (
-                    <span key={item.id} className="mr-2">
-                      {item.quantity}x {item.product.name}
-                    </span>
-                  ))}
-                  {order.order_items.length > 3 && (
-                    <span className="text-gray-500">
-                      +{order.order_items.length - 3} mas
-                    </span>
-                  )}
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Selected order detail */}
-      {selectedOrder && (
-        <div className="lg:w-96 bg-white rounded-xl shadow-sm flex flex-col">
-          <div className="p-4 border-b">
-            <div className="flex justify-between items-center">
-              <h2 className="font-semibold">Detalle del Pedido</h2>
-              <button
-                onClick={() => setSelectedOrder(null)}
-                className="p-1 hover:bg-gray-100 rounded"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
+      <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 no-print">
+        {/* Orders list */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex justify-between items-center mb-4">
+            <h1 className="text-2xl font-bold text-gray-900">
+              Cola de Pedidos ({orders.length})
+            </h1>
+            <button
+              onClick={async () => {
+                const amount = prompt('Monto final contado:');
+                if (!amount) return;
+                try {
+                  const result = await cashRegisterApi.close(parseFloat(amount));
+                  showToast.success(
+                    `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
+                  );
+                  loadData();
+                } catch (error: any) {
+                  showToast.error(error.message || 'Error cerrando caja');
+                }
+              }}
+              className="btn-secondary text-sm"
+            >
+              Cerrar Caja
+            </button>
           </div>
 
-          <div className="flex-1 overflow-y-auto p-4">
-            <div className="space-y-3">
-              {selectedOrder.order_items.map((item) => (
+          <div className="flex-1 overflow-y-auto space-y-3">
+            {orders.length === 0 ? (
+              <EmptyState
+                icon={<Clock className="w-full h-full" />}
+                title="No hay pedidos pendientes"
+                description="Los pedidos aparecerán aquí cuando los vendedores los envíen"
+              />
+            ) : (
+              orders.map((order) => (
                 <div
-                  key={item.id}
-                  className="flex justify-between items-center py-2 border-b"
-                >
-                  <div>
-                    <p className="font-medium">{item.product.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.quantity} x ${item.unit_price.toFixed(2)}
-                    </p>
-                  </div>
-                  <span className="font-semibold">
-                    ${(item.quantity * item.unit_price).toFixed(2)}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {selectedOrder.notes && (
-              <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  <strong>Nota:</strong> {selectedOrder.notes}
-                </p>
-              </div>
-            )}
-          </div>
-
-          <div className="p-4 border-t space-y-3">
-            <div className="flex justify-between items-center text-xl font-bold">
-              <span>Total:</span>
-              <span className="text-primary-600">
-                ${selectedOrder.total.toFixed(2)}
-              </span>
-            </div>
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => handleCancelOrder(selectedOrder.id)}
-                className="btn-danger flex-1"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => setShowPaymentModal(true)}
-                className="btn-success flex-1"
-              >
-                Cobrar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Payment Modal */}
-      {showPaymentModal && selectedOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-            <h3 className="text-lg font-semibold mb-4">Procesar Pago</h3>
-
-            <div className="mb-4">
-              <p className="text-2xl font-bold text-primary-600 text-center">
-                ${selectedOrder.total.toFixed(2)}
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mb-4">
-              {[
-                { id: 'cash', icon: Banknote, label: 'Efectivo' },
-                { id: 'card', icon: CreditCard, label: 'Tarjeta' },
-                { id: 'transfer', icon: Smartphone, label: 'Transferencia' },
-              ].map((method) => (
-                <button
-                  key={method.id}
-                  onClick={() => setPaymentMethod(method.id)}
-                  className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${paymentMethod === method.id
-                    ? 'border-primary-500 bg-primary-50'
-                    : 'border-gray-200'
+                  key={order.id}
+                  onClick={() => handleTakeOrder(order)}
+                  className={`card cursor-pointer hover:shadow-md transition-shadow ${selectedOrder?.id === order.id
+                    ? 'ring-2 ring-primary-500'
+                    : ''
                     }`}
                 >
-                  <method.icon className="w-6 h-6" />
-                  <span className="text-xs">{method.label}</span>
-                </button>
-              ))}
-            </div>
-
-            {paymentMethod === 'cash' && (
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Monto recibido
-                </label>
-                <input
-                  type="number"
-                  value={amountReceived}
-                  onChange={(e) => setAmountReceived(e.target.value)}
-                  className="input"
-                  placeholder="0.00"
-                />
-                {amountReceived && calculateChange() >= 0 && (
-                  <p className="text-lg font-semibold text-green-600 mt-2">
-                    Cambio: ${calculateChange().toFixed(2)}
-                  </p>
-                )}
-              </div>
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex-1">
+                      <span className="text-xs text-gray-500">
+                        #{order.id.slice(0, 8)}
+                      </span>
+                      <p className="font-medium">{order.user.name}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handlePrint('comanda', order);
+                        }}
+                        className="p-2 text-gray-500 hover:text-primary-600 rounded-lg hover:bg-primary-50"
+                        title="Imprimir Comanda"
+                      >
+                        <Printer className="w-5 h-5" />
+                      </button>
+                      <span className="text-lg font-bold text-primary-600">
+                        ${order.total.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-500">
+                    <Clock className="w-4 h-4" />
+                    {new Date(order.created_at).toLocaleTimeString()}
+                  </div>
+                  <div className="mt-2 text-sm">
+                    {order.order_items.slice(0, 3).map((item) => (
+                      <span key={item.id} className="mr-2">
+                        {item.quantity}x {item.product.name}
+                      </span>
+                    ))}
+                    {order.order_items.length > 3 && (
+                      <span className="text-gray-500">
+                        +{order.order_items.length - 3} mas
+                      </span>
+                    )}
+                  </div>
+                </div>
+              ))
             )}
-
-            <div className="flex gap-2">
-              <button
-                onClick={() => setShowPaymentModal(false)}
-                className="btn-secondary flex-1"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={handleProcessPayment}
-                disabled={
-                  processingPayment ||
-                  (paymentMethod === 'cash' &&
-                    (!amountReceived ||
-                      parseFloat(amountReceived) < selectedOrder.total))
-                }
-                className="btn-success flex-1 flex items-center justify-center gap-2"
-              >
-                <Check className="w-5 h-5" />
-                {processingPayment ? 'Procesando...' : 'Confirmar'}
-              </button>
-            </div>
           </div>
         </div>
-      )}
-      {/* Printing Component */}
-      <PrintTicket
-        ref={printRef}
-        type={printType}
-        data={orderToPrint}
-        tenant={user?.tenant}
-      />
-    </div>
-  );
+
+        {/* Selected order detail */}
+        {selectedOrder && (
+          <div className="lg:w-96 bg-white rounded-xl shadow-sm flex flex-col">
+            <div className="p-4 border-b">
+              <div className="flex justify-between items-center">
+                <h2 className="font-semibold">Detalle del Pedido</h2>
+                <button
+                  onClick={() => setSelectedOrder(null)}
+                  className="p-1 hover:bg-gray-100 rounded"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4">
+              <div className="space-y-3">
+                {selectedOrder.order_items.map((item) => (
+                  <div
+                    key={item.id}
+                    className="flex justify-between items-center py-2 border-b"
+                  >
+                    <div>
+                      <p className="font-medium">{item.product.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {item.quantity} x ${item.unit_price.toFixed(2)}
+                      </p>
+                    </div>
+                    <span className="font-semibold">
+                      ${(item.quantity * item.unit_price).toFixed(2)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {selectedOrder.notes && (
+                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
+                  <p className="text-sm text-yellow-800">
+                    <strong>Nota:</strong> {selectedOrder.notes}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t space-y-3">
+              <div className="flex justify-between items-center text-xl font-bold">
+                <span>Total:</span>
+                <span className="text-primary-600">
+                  ${selectedOrder.total.toFixed(2)}
+                </span>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => handleCancelOrder(selectedOrder.id)}
+                  className="btn-danger flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => setShowPaymentModal(true)}
+                  className="btn-success flex-1"
+                >
+                  Cobrar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Payment Modal */}
+        {showPaymentModal && selectedOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
+              <h3 className="text-lg font-semibold mb-4">Procesar Pago</h3>
+
+              <div className="mb-4">
+                <p className="text-2xl font-bold text-primary-600 text-center">
+                  ${selectedOrder.total.toFixed(2)}
+                </p>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 mb-4">
+                {[
+                  { id: 'cash', icon: Banknote, label: 'Efectivo' },
+                  { id: 'card', icon: CreditCard, label: 'Tarjeta' },
+                  { id: 'transfer', icon: Smartphone, label: 'Transferencia' },
+                ].map((method) => (
+                  <button
+                    key={method.id}
+                    onClick={() => setPaymentMethod(method.id)}
+                    className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${paymentMethod === method.id
+                      ? 'border-primary-500 bg-primary-50'
+                      : 'border-gray-200'
+                      }`}
+                  >
+                    <method.icon className="w-6 h-6" />
+                    <span className="text-xs">{method.label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {paymentMethod === 'cash' && (
+                <div className="mb-4">
+                  <label className="block text-sm font-medium mb-1">
+                    Monto recibido
+                  </label>
+                  <input
+                    type="number"
+                    value={amountReceived}
+                    onChange={(e) => setAmountReceived(e.target.value)}
+                    className="input"
+                    placeholder="0.00"
+                  />
+                  {amountReceived && calculateChange() >= 0 && (
+                    <p className="text-lg font-semibold text-green-600 mt-2">
+                      Cambio: ${calculateChange().toFixed(2)}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowPaymentModal(false)}
+                  className="btn-secondary flex-1"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={handleProcessPayment}
+                  disabled={
+                    processingPayment ||
+                    (paymentMethod === 'cash' &&
+                      (!amountReceived ||
+                        parseFloat(amountReceived) < selectedOrder.total))
+                  }
+                  className="btn-success flex-1 flex items-center justify-center gap-2"
+                >
+                  <Check className="w-5 h-5" />
+                  {processingPayment ? 'Procesando...' : 'Confirmar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {/* Printing Component */}
+        <PrintTicket
+          ref={printRef}
+          type={printType}
+          data={orderToPrint}
+          tenant={user?.tenant}
+        />
+      </div>
+      );
 }
