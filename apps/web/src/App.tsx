@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './stores/authStore';
+import { useCapacitor } from './hooks/useCapacitor';
 import { Layout } from './components/Layout';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { LoginPage } from './pages/LoginPage';
@@ -19,6 +20,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 }
 
 function App() {
+  // Inicializar Capacitor en plataformas nativas
+  useCapacitor();
+
   return (
     <>
       <OfflineIndicator />

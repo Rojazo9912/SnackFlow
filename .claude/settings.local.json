@@ -9,7 +9,9 @@
       "Bash(dir /s \"c:\\\\Users\\\\ADMIN_SISTEMAS\\\\OneDrive - Desarrollos ROD\\\\Documentos\\\\Desarrollos\\\\SnackFlow\\\\apps\\\\web\\\\src\")",
       "Bash(dir \"c:\\\\Users\\\\ADMIN_SISTEMAS\\\\OneDrive - Desarrollos ROD\\\\Documentos\\\\Desarrollos\\\\SnackFlow\\\\apps\\\\web\\\\src\" /B /S)",
       "Bash(pnpm install:*)",
-      "Bash(pnpm run build:*)"
+      "Bash(pnpm run build:*)",
+      "Bash(pnpm build:*)",
+      "Bash(npx cap:*)"
     ]
   }
 }
