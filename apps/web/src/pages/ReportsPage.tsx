@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Calendar, Printer } from 'lucide-react';
+import { Calendar, Printer, FileSpreadsheet, FileText } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { reportsApi } from '../services/api';
 import { useRef } from 'react';
@@ -20,6 +20,33 @@ export function ReportsPage() {
   const handlePrint = () => {
     if (!dailySales) return;
     window.print();
+  };
+
+  const handleExportExcel = async () => {
+    try {
+      await reportsApi.exportDailySales({ date, format: 'excel' });
+      toast.success('Reporte Excel generado');
+    } catch (error) {
+      toast.error('Error exportando a Excel');
+    }
+  };
+
+  const handleExportPdf = async () => {
+    try {
+      await reportsApi.exportDailySales({ date, format: 'pdf' });
+      toast.success('Reporte PDF generado');
+    } catch (error) {
+      toast.error('Error exportando a PDF');
+    }
+  };
+
+  const handleExportTopProducts = async () => {
+    try {
+      await reportsApi.exportTopProducts({ days: 7 });
+      toast.success('Reporte de productos generado');
+    } catch (error) {
+      toast.error('Error exportando reporte');
+    }
   };
 
   useEffect(() => {
@@ -72,6 +99,22 @@ export function ReportsPage() {
           >
             <Printer className="w-5 h-5" />
             <span className="hidden sm:inline">Imprimir</span>
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="btn-secondary flex items-center gap-2 text-green-600 border-green-200 hover:bg-green-50"
+            title="Exportar a Excel"
+          >
+            <FileSpreadsheet className="w-5 h-5" />
+            <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            onClick={handleExportPdf}
+            className="btn-secondary flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+            title="Exportar a PDF"
+          >
+            <FileText className="w-5 h-5" />
+            <span className="hidden sm:inline">PDF</span>
           </button>
         </div>
       </div>
@@ -153,8 +196,15 @@ export function ReportsPage() {
 
       {/* Top products */}
       <div className="card">
-        <h2 className="font-semibold mb-4">
-          Productos mas vendidos ({topProducts?.period})
+        <h2 className="font-semibold mb-4 leading-none flex justify-between items-center">
+          <span>Productos mas vendidos ({topProducts?.period})</span>
+          <button
+            onClick={handleExportTopProducts}
+            className="text-primary-600 hover:text-primary-700 text-sm flex items-center gap-1 font-medium"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Exportar Excel
+          </button>
         </h2>
         <div className="space-y-3">
           {topProducts?.products.map((product: any, index: number) => (

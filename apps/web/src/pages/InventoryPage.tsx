@@ -234,11 +234,13 @@ export function InventoryPage() {
                   required
                 >
                   <option value="">Seleccionar producto</option>
-                  {products.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} (Stock: {p.stock})
-                    </option>
-                  ))}
+                  {products
+                    .filter((p) => !p.is_composite)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (Stock: {p.stock})
+                      </option>
+                    ))}
                 </select>
               </div>
 
@@ -256,11 +258,10 @@ export function InventoryPage() {
                       key={type.id}
                       type="button"
                       onClick={() => setAdjustType(type.id as any)}
-                      className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 ${
-                        adjustType === type.id
+                      className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 ${adjustType === type.id
                           ? `border-${type.color}-500 bg-${type.color}-50`
                           : 'border-gray-200'
-                      }`}
+                        }`}
                     >
                       <type.icon className="w-5 h-5" />
                       <span className="text-xs">{type.label}</span>

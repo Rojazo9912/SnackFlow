@@ -376,14 +376,18 @@ export function ProductsPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">Stock</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Stock {formData.isComposite && '(Calculado)'}
+                  </label>
                   <input
                     type="number"
                     value={formData.stock}
                     onChange={(e) =>
                       setFormData({ ...formData, stock: e.target.value })
                     }
-                    className="input"
+                    className="input disabled:bg-gray-50 disabled:text-gray-500"
+                    disabled={formData.isComposite}
+                    placeholder={formData.isComposite ? 'Calculado' : ''}
                   />
                 </div>
                 <div>
@@ -401,22 +405,42 @@ export function ProductsPage() {
                 </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium mb-1">Categoria</label>
-                <select
-                  value={formData.categoryId}
-                  onChange={(e) =>
-                    setFormData({ ...formData, categoryId: e.target.value })
-                  }
-                  className="input"
-                >
-                  <option value="">Sin categoria</option>
-                  {categories.map((cat) => (
-                    <option key={cat.id} value={cat.id}>
-                      {cat.name}
-                    </option>
-                  ))}
-                </select>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Categoria</label>
+                  <select
+                    value={formData.categoryId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, categoryId: e.target.value })
+                    }
+                    className="input"
+                  >
+                    <option value="">Sin categoria</option>
+                    {categories.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Unidad</label>
+                  <select
+                    value={formData.unit}
+                    onChange={(e) =>
+                      setFormData({ ...formData, unit: e.target.value })
+                    }
+                    className="input"
+                  >
+                    <option value="pieza">Pieza</option>
+                    <option value="kg">Kilogramo (kg)</option>
+                    <option value="gr">Gramo (gr)</option>
+                    <option value="lt">Litro (lt)</option>
+                    <option value="ml">Mililitro (ml)</option>
+                    <option value="caja">Caja</option>
+                    <option value="paquete">Paquete</option>
+                  </select>
+                </div>
               </div>
 
               <div className="flex items-center gap-2 py-2">

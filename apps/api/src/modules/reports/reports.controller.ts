@@ -1,4 +1,5 @@
-import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -12,7 +13,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @Roles(Role.ADMIN, Role.SUPERVISOR)
 @Controller('reports')
 export class ReportsController {
-  constructor(private readonly reportsService: ReportsService) {}
+  constructor(private readonly reportsService: ReportsService) { }
 
   @Get('dashboard')
   @ApiOperation({ summary: 'Obtener resumen para dashboard' })
@@ -56,5 +57,62 @@ export class ReportsController {
   @ApiOperation({ summary: 'Comparar ventas de hoy vs ayer' })
   async getComparison(@CurrentUser('tenantId') tenantId: string) {
     return this.reportsService.getSalesComparison(tenantId);
+  }
+
+  @Get('daily-sales/export')
+  @ApiOperation({ summary: 'Exportar ventas del dia' })
+  @ApiQuery({ name: 'date', required: false })
+  @ApiQuery({ name: 'format', required: false, enum: ['excel', 'pdf'] })
+  async exportDailySales(
+    @CurrentUser('tenantId') tenantId: string,
+    @Res() res: Response,
+    @Query('date') date?: string,
+    @Query('format') format: 'excel' | 'pdf' = 'excel',
+  ) {
+    const buffer =
+      format === 'pdf'
+        ? await this.reportsService.generateDailySalesReportPDF(tenantId, date)
+        : await this.reportsService.generateDailySalesReportExcel(tenantId, date);
+
+    const filename = `ventas_${date || new Date().toISOString().split('T')[0]}`;
+    const contentType =
+      format === 'pdf'
+        ? 'application/pdf'
+        : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    const extension = format === 'pdf' ? 'pdf' : 'xlsx';
+
+    res.set({
+      'Content-Type': contentType,
+      'Content-Disposition': `attachment; filename="${filename}.${extension}"`,
+      'Content-Length': buffer.length,
+    });
+
+    res.end(buffer);
+  }
+
+  @Get('top-products/export')
+  @ApiOperation({ summary: 'Exportar productos mas vendidos' })
+  @ApiQuery({ name: 'days', required: false, type: Number })
+  @ApiQuery({ name: 'format', required: false, enum: ['excel', 'pdf'] })
+  async exportTopProducts(
+    @CurrentUser('tenantId') tenantId: string,
+    @Res() res: Response,
+    @Query('days') days?: number,
+    @Query('format') format: 'excel' | 'pdf' = 'excel',
+  ) {
+    // Only Excel for now for Top Products to keep it simple, or add PDF if requested
+    const buffer = await this.reportsService.generateTopProductsReportExcel(
+      tenantId,
+      days,
+    );
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': `attachment; filename="top_productos_${days || 7}dias.xlsx"`,
+      'Content-Length': buffer.length,
+    });
+
+    res.end(buffer);
   }
 }

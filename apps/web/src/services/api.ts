@@ -173,6 +173,51 @@ export const reportsApi = {
   getTopProducts: (days = 7, limit = 10) =>
     api.get<any>(`/reports/top-products?days=${days}&limit=${limit}`),
   getComparison: () => api.get<any>('/reports/comparison'),
+  exportDailySales: async (params?: { date?: string; format?: 'excel' | 'pdf' }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.date) searchParams.set('date', params.date);
+    if (params?.format) searchParams.set('format', params.format);
+
+    const response = await fetch(`${API_URL}/reports/daily-sales/export?${searchParams.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('sf_token')}`,
+      },
+    });
+
+    if (!response.ok) throw new Error('Error exportando reporte');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `reporte_ventas_${params?.date || new Date().toISOString().split('T')[0]}.${params?.format === 'pdf' ? 'pdf' : 'xlsx'}`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
+  exportTopProducts: async (params?: { days?: number }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.days) searchParams.set('days', params.days.toString());
+
+    const response = await fetch(`${API_URL}/reports/top-products/export?${searchParams.toString()}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('sf_token')}`,
+      },
+    });
+
+    if (!response.ok) throw new Error('Error exportando reporte');
+
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `top_productos_${params?.days || 7}dias.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+  },
 };
 
 // Users

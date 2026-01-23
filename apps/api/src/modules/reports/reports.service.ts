@@ -1,6 +1,9 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../database/database.module';
+import * as ExcelJS from 'exceljs';
+import * as PdfPrinter from 'pdfmake';
+import { TDocumentDefinitions } from 'pdfmake/interfaces';
 
 @Injectable()
 export class ReportsService {
@@ -200,5 +203,112 @@ export class ReportsService {
     if (error) return 0;
 
     return data?.filter((p) => p.stock <= p.min_stock).length || 0;
+  }
+
+  async generateDailySalesReportExcel(tenantId: string, date?: string) {
+    const data = await this.getDailySales(tenantId, date);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Ventas Diarias');
+
+    // Styling
+    worksheet.columns = [
+      { header: 'Concepto', key: 'label', width: 30 },
+      { header: 'Valor', key: 'value', width: 20 },
+    ];
+
+    worksheet.addRow({ label: 'Fecha de Reporte', value: data.date });
+    worksheet.addRow({ label: 'Total de Ventas', value: data.totalSales });
+    worksheet.addRow({ label: 'Cantidad de Tickets', value: data.ticketCount });
+    worksheet.addRow({ label: 'Ticket Promedio', value: data.averageTicket });
+    worksheet.addRow({});
+    worksheet.addRow({ label: 'Ventas por Método de Pago' }).font = { bold: true };
+
+    Object.entries(data.byPaymentMethod || {}).forEach(([method, stats]: [string, any]) => {
+      worksheet.addRow({
+        label: method.toUpperCase(),
+        value: `${stats.total} (${stats.count} tickets)`,
+      });
+    });
+
+    return workbook.xlsx.writeBuffer();
+  }
+
+  async generateDailySalesReportPDF(tenantId: string, date?: string): Promise<Buffer> {
+    const data = await this.getDailySales(tenantId, date);
+
+    const docDefinition: TDocumentDefinitions = {
+      content: [
+        { text: 'SnackFlow - Reporte de Ventas Diarias', style: 'header' },
+        { text: `Fecha: ${data.date}`, margin: [0, 10, 0, 20] },
+        {
+          table: {
+            widths: ['*', '*'],
+            body: [
+              ['Concepto', 'Valor'],
+              ['Total de Ventas', `$${data.totalSales.toFixed(2)}`],
+              ['Cantidad de Tickets', data.ticketCount.toString()],
+              ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`],
+            ],
+          },
+        },
+        { text: '\nResumen por Método de Pago', style: 'subheader' },
+        {
+          table: {
+            widths: ['*', '*', '*'],
+            body: [
+              ['Método', 'Ventas', 'Tickets'],
+              ...Object.entries(data.byPaymentMethod || {}).map(([method, stats]: [string, any]) => [
+                method.toUpperCase(),
+                `$${stats.total.toFixed(2)}`,
+                stats.count.toString(),
+              ]),
+            ],
+          },
+        },
+      ],
+      styles: {
+        header: { fontSize: 18, bold: true },
+        subheader: { fontSize: 14, bold: true, margin: [0, 10, 0, 5] },
+      },
+    };
+
+    const fonts = {
+      Roboto: {
+        normal: 'Helvetica',
+        bold: 'Helvetica-Bold',
+        italics: 'Helvetica-Oblique',
+        bolditalics: 'Helvetica-BoldOblique',
+      },
+    };
+
+    const printer = new PdfPrinter(fonts);
+    const pdfDoc = printer.createPdfKitDocument(docDefinition);
+
+    return new Promise((resolve, reject) => {
+      const chunks: any[] = [];
+      pdfDoc.on('data', (chunk: any) => chunks.push(chunk));
+      pdfDoc.on('end', () => resolve(Buffer.concat(chunks)));
+      pdfDoc.on('error', reject);
+      pdfDoc.end();
+    });
+  }
+
+  async generateTopProductsReportExcel(tenantId: string, days = 7) {
+    const data = await this.getTopProducts(tenantId, days);
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Productos más vendidos');
+
+    worksheet.columns = [
+      { header: 'Producto', key: 'name', width: 30 },
+      { header: 'Código', key: 'code', width: 15 },
+      { header: 'Cantidad', key: 'quantity', width: 15 },
+      { header: 'Ingresos', key: 'revenue', width: 15 },
+    ];
+
+    data.products.forEach((p) => {
+      worksheet.addRow(p);
+    });
+
+    return workbook.xlsx.writeBuffer();
   }
 }
