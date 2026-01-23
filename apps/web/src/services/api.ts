@@ -129,8 +129,17 @@ export const ordersApi = {
     api.post<any>('/orders', data),
   updateStatus: (id: string, status: string, reason?: string) =>
     api.patch<any>(`/orders/${id}/status`, { status, reason }),
-  processPayment: (id: string, paymentMethod: string, paymentDetails?: any) =>
-    api.post<any>(`/orders/${id}/pay`, { paymentMethod, paymentDetails }),
+  processPayment: (
+    id: string,
+    payments: Array<{ method: string; amount: number }>,
+    amountReceived?: number,
+    change?: number
+  ) =>
+    api.post<any>(`/orders/${id}/pay`, {
+      payments,
+      amountReceived,
+      change,
+    }),
   cancel: (id: string, reason: string) =>
     api.post<any>(`/orders/${id}/cancel`, { reason }),
 };

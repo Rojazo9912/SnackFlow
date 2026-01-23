@@ -23,7 +23,7 @@ export class OrdersService {
   constructor(
     @Inject(SUPABASE_CLIENT)
     private readonly supabase: SupabaseClient,
-  ) {}
+  ) { }
 
   async findAll(
     tenantId: string,
@@ -241,13 +241,27 @@ export class OrdersService {
       throw new BadRequestException('El pedido no esta en caja');
     }
 
-    // Update order with payment info
+    // Validate total payment amount
+    const totalPaid = paymentDto.payments.reduce((sum, p) => sum + p.amount, 0);
+    if (Math.abs(totalPaid - order.total) > 0.01) {
+      throw new BadRequestException(
+        `El monto total pagado ($${totalPaid}) no coincide con el total del pedido ($${order.total})`,
+      );
+    }
+
+    // Update order status
     const { error: orderError } = await this.supabase
       .from('orders')
       .update({
         status: OrderStatus.PAID,
-        payment_method: paymentDto.paymentMethod,
-        payment_details: paymentDto.paymentDetails,
+        payment_method: paymentDto.payments.length === 1
+          ? paymentDto.payments[0].method
+          : 'mixed',
+        payment_details: JSON.stringify({
+          payments: paymentDto.payments,
+          amountReceived: paymentDto.amountReceived,
+          change: paymentDto.change,
+        }),
         cashier_id: userId,
         updated_at: new Date().toISOString(),
       })
@@ -258,7 +272,24 @@ export class OrdersService {
       throw new Error(`Error procesando pago: ${orderError.message}`);
     }
 
-    // Decrease stock for each item (handles composite products automatically)
+    // Insert payment records
+    const paymentRecords = paymentDto.payments.map((payment) => ({
+      order_id: id,
+      payment_method: payment.method,
+      amount: payment.amount,
+      tenant_id: tenantId,
+    }));
+
+    const { error: paymentsError } = await this.supabase
+      .from('order_payments')
+      .insert(paymentRecords);
+
+    if (paymentsError) {
+      console.error('Error creating payment records:', paymentsError);
+      // Don't fail the whole transaction, just log
+    }
+
+    // Decrease stock for each item
     for (const item of order.order_items) {
       await this.supabase.rpc('decrease_composite_stock', {
         p_product_id: item.product.id,

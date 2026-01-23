@@ -1,29 +1,30 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsOptional, IsNumber, IsObject, Min } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 
-export enum PaymentMethod {
-  CASH = 'cash',
-  CARD = 'card',
-  TRANSFER = 'transfer',
-  MIXED = 'mixed',
+export class PaymentMethodDto {
+  @IsString()
+  method: string; // 'cash', 'card', 'transfer'
+
+  @IsNumber()
+  @Min(0)
+  amount: number;
 }
 
 export class ProcessPaymentDto {
-  @ApiProperty({ enum: PaymentMethod })
-  @IsEnum(PaymentMethod, { message: 'Metodo de pago invalido' })
-  paymentMethod: PaymentMethod;
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => PaymentMethodDto)
+  payments: PaymentMethodDto[];
 
-  @ApiPropertyOptional({
-    example: { amountReceived: 100, change: 15 },
-    description: 'Detalles adicionales del pago',
-  })
-  @IsObject()
   @IsOptional()
-  paymentDetails?: Record<string, unknown>;
-
-  @ApiPropertyOptional({ example: 100 })
   @IsNumber()
+  amountReceived?: number; // For cash change calculation
+
   @IsOptional()
-  @Min(0)
-  amountReceived?: number;
+  @IsNumber()
+  change?: number;
+
+  @IsOptional()
+  @IsString()
+  paymentDetails?: string;
 }

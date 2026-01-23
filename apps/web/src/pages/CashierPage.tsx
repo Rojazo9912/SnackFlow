@@ -17,6 +17,7 @@ import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../utils/notifications';
+import { MixedPaymentModal } from '../components/MixedPaymentModal';
 
 interface Order {
   id: string;
@@ -42,6 +43,7 @@ export function CashierPage() {
 
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showMixedPayment, setShowMixedPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
 
@@ -115,30 +117,35 @@ export function CashierPage() {
     }
   };
 
-  const handleProcessPayment = async () => {
+  const handleProcessPayment = async (payments?: Array<{ method: string; amount: number }>, receivedAmount?: number, changeAmount?: number) => {
     if (!selectedOrder) return;
 
     setProcessingPayment(true);
     try {
-      const paymentDetails: any = { paymentMethod };
-      if (paymentMethod === 'cash' && amountReceived) {
-        paymentDetails.amountReceived = parseFloat(amountReceived);
-        paymentDetails.change = parseFloat(amountReceived) - selectedOrder.total;
-      }
+      // If no payments array provided, use single payment method
+      const paymentData = payments || [{ method: paymentMethod, amount: selectedOrder.total }];
+      const received = receivedAmount || (amountReceived ? parseFloat(amountReceived) : undefined);
+      const change = changeAmount || (received && paymentMethod === 'cash' ? received - selectedOrder.total : undefined);
 
       await ordersApi.processPayment(
         selectedOrder.id,
-        paymentMethod,
-        paymentDetails
+        paymentData,
+        received,
+        change
       );
 
       // Prepare for printing
-      setOrderToPrint({ ...selectedOrder, payment_method: paymentMethod } as any);
+      setOrderToPrint({
+        ...selectedOrder,
+        payment_method: paymentData.length === 1 ? paymentData[0].method : 'mixed',
+        payment_details: { payments: paymentData, amountReceived: received, change }
+      } as any);
       setPrintType('ticket');
 
       showToast.success('Pago procesado correctamente');
       setSelectedOrder(null);
       setShowPaymentModal(false);
+      setShowMixedPayment(false);
       setAmountReceived('');
       loadOrders();
     } catch (error: any) {
@@ -464,7 +471,7 @@ export function CashierPage() {
                   Cancelar
                 </button>
                 <button
-                  onClick={handleProcessPayment}
+                  onClick={() => handleProcessPayment()}
                   disabled={
                     processingPayment ||
                     (paymentMethod === 'cash' &&
@@ -487,6 +494,16 @@ export function CashierPage() {
           data={orderToPrint}
           tenant={user?.tenant}
         />
+
+        {/* Mixed Payment Modal */}
+        {selectedOrder && (
+          <MixedPaymentModal
+            isOpen={showMixedPayment}
+            onClose={() => setShowMixedPayment(false)}
+            total={selectedOrder.total}
+            onConfirm={handleProcessPayment}
+          />
+        )}
       </div>
     </div>
   );
