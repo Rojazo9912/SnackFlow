@@ -186,13 +186,21 @@ export function SalesPage() {
               {filteredProducts.map((product: Product) => (
                 <button
                   key={product.id}
-                  onClick={() =>
+                  onClick={() => {
+                    const currentQuantity = items.find(i => i.productId === product.id)?.quantity || 0;
+                    const availableStock = getAvailableStock(product);
+
+                    if (currentQuantity >= availableStock) {
+                      showToast.warning(`Stock insuficiente. Solo hay ${availableStock} disponibles`);
+                      return;
+                    }
+
                     addItem({
                       id: product.id,
                       name: product.name,
                       price: product.price,
-                    })
-                  }
+                    });
+                  }}
                   disabled={getAvailableStock(product) <= 0}
                   className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${getAvailableStock(product) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
                     }`}
