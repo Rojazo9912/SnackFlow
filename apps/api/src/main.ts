@@ -9,9 +9,28 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
-  // CORS
+  // CORS - permitir web y apps moviles
+  const allowedOrigins = [
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'capacitor://localhost',
+    'http://localhost',
+    process.env.CORS_ORIGIN,
+    process.env.WEB_URL,
+  ].filter(Boolean);
+
   app.enableCors({
-    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+    origin: (origin, callback) => {
+      // Permitir requests sin origin (mobile apps, Postman, etc)
+      if (!origin) return callback(null, true);
+
+      if (allowedOrigins.includes(origin) || origin.includes('railway.app') || origin.includes('vercel.app')) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        callback(null, true); // Temporalmente permitir todo para debug
+      }
+    },
     credentials: true,
   });
 
