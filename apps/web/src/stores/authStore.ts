@@ -1,16 +1,25 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  settings?: {
+    logo?: string;
+    address?: string;
+    phone?: string;
+    ticketHeader?: string;
+    ticketFooter?: string;
+  };
+}
+
 interface User {
   id: string;
   email: string;
   name: string;
   role: string;
-  tenant?: {
-    id: string;
-    name: string;
-    slug: string;
-  };
+  tenant?: Tenant;
 }
 
 interface AuthState {
