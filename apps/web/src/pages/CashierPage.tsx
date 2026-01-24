@@ -184,7 +184,7 @@ export function CashierPage() {
       // Get completed orders from today
       const today = new Date().toISOString().split('T')[0];
       const salesData = await ordersApi.getAll({
-        status: 'completed',
+        status: 'paid',
         fromDate: today
       });
       setRecentSales(salesData.slice(0, 20)); // Last 20 sales
@@ -675,12 +675,7 @@ export function CashierPage() {
           </div>
         )}
         {/* Printing Component */}
-        <PrintTicket
-          ref={printRef}
-          type={printType}
-          data={orderToPrint}
-          tenant={user?.tenant}
-        />
+
 
         {/* Mixed Payment Modal */}
         {selectedOrder && (
@@ -791,6 +786,14 @@ export function CashierPage() {
           </div>
         )}
       </div>
+
+      {/* Printing Component - Moved outside no-print to ensure visibility */}
+      <PrintTicket
+        ref={printRef}
+        type={printType}
+        data={orderToPrint}
+        tenant={user?.tenant}
+      />
     </div>
   );
 }
