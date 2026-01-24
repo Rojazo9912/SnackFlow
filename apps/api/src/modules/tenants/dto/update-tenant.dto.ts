@@ -11,4 +11,8 @@ export class UpdateTenantDto {
   @IsString()
   @IsOptional()
   slug?: string;
+
+  @ApiPropertyOptional({ example: { logo: 'url', phone: '123' } })
+  @IsOptional()
+  settings?: Record<string, any>;
 }
