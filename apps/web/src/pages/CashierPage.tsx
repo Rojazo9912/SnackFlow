@@ -58,7 +58,7 @@ export function CashierPage() {
   // Printing state
   const printRef = useRef<HTMLDivElement>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
-  const [printType, setPrintType] = useState<'ticket' | 'comanda'>('ticket');
+  const [printType, setPrintType] = useState<'ticket' | 'comanda' | 'drawer'>('ticket');
   const { user } = useAuthStore();
 
   // Recent sales state
@@ -131,6 +131,16 @@ export function CashierPage() {
       } catch (error) {
         showToast.error('Error al reimprimir ticket');
       }
+    },
+    onOpenDrawer: () => {
+      setPrintType('drawer');
+      setOrderToPrint({} as any); // Dummy data for drawer
+      setTimeout(() => {
+        window.print();
+        // Restore to ticket mode after a delay
+        setTimeout(() => setPrintType('ticket'), 1000);
+      }, 100);
+      showToast.success('Abriendo cajón...');
     },
   });
 

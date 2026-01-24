@@ -7,6 +7,7 @@ interface KeyboardShortcutConfig {
     onOpenCashRegister?: () => void;
     onProcessPayment?: () => void;
     onReprintTicket?: () => void;
+    onOpenDrawer?: () => void;
     onShowHelp?: () => void;
 }
 
@@ -25,6 +26,14 @@ export function useGlobalKeyboardShortcuts(config: KeyboardShortcutConfig = {}) 
                 // Allow Esc to close modals even when in input
                 if (event.key !== 'Escape') {
                     return;
+                }
+            }
+
+            // F7 - Open Cash Drawer (Physical)
+            if (event.key === 'F7') {
+                event.preventDefault();
+                if (config.onOpenDrawer) {
+                    config.onOpenDrawer();
                 }
             }
 

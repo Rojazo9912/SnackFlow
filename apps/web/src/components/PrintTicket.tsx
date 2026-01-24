@@ -1,16 +1,25 @@
 import { forwardRef } from 'react';
 
 interface PrintTicketProps {
-    type: 'ticket' | 'comanda' | 'report';
+    type: 'ticket' | 'comanda' | 'report' | 'drawer';
     data: any;
     tenant: any;
+    ref?: React.ForwardedRef<HTMLDivElement>;
 }
 
 export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
     ({ type, data, tenant }, ref) => {
-        if (!data) return null;
+        if (!data && type !== 'drawer') return null;
 
         const settings = tenant?.settings || {};
+
+        // ... existing logic ...
+
+        const renderDrawerKick = () => (
+            <div className="print-content" style={{ width: '80mm', height: '10mm' }}>
+                <p style={{ opacity: 0.01 }}>.</p>
+            </div>
+        );
 
         // Safe JSON parsing - handle both string and object
         let paymentDetails = null;
@@ -279,6 +288,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 {type === 'ticket' && renderTicket()}
                 {type === 'comanda' && renderComanda()}
                 {type === 'report' && renderReport()}
+                {type === 'drawer' && renderDrawerKick()}
             </div>
         );
     }
