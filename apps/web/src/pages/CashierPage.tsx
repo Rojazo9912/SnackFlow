@@ -88,14 +88,24 @@ export function CashierPage() {
 
   const loadData = async () => {
     try {
-      const [ordersData, sessionData] = await Promise.all([
+      const [ordersData, sessionData, tenantData] = await Promise.all([
         ordersApi.getPending(),
         cashRegisterApi.getCurrent(),
+        tenantsApi.getCurrent(), // Load tenant info for printing
       ]);
       setOrders(ordersData);
       setCashSession(sessionData);
-    } catch (error) {
-      showToast.error('Error cargando datos');
+
+      // Store tenant data for printing
+      if (tenantData && user) {
+        user.tenant = tenantData;
+      }
+    } catch (error: any) {
+      if (error.message?.includes('No hay caja abierta')) {
+        setCashSession(null);
+      } else {
+        showToast.error('Error cargando datos');
+      }
     } finally {
       setLoading(false);
     }
