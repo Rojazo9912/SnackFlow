@@ -271,7 +271,11 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         );
 
         return (
-            <div ref={ref} className="hidden print:block">
+            <div
+                ref={ref}
+                className="fixed left-[-9999px] top-0 print:left-0 print:top-0 print:relative"
+                style={{ width: '80mm' }}
+            >
                 {type === 'ticket' && renderTicket()}
                 {type === 'comanda' && renderComanda()}
                 {type === 'report' && renderReport()}

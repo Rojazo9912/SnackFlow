@@ -26,11 +26,15 @@ interface Order {
   notes: string;
   created_at: string;
   user: { id: string; name: string };
+  cashier?: { id: string; name: string };
+  payment_method?: string;
+  payment_details?: any;
   order_items: Array<{
     id: string;
     quantity: number;
     unit_price: number;
     product: { id: string; name: string };
+    notes?: string;
   }>;
 }
 
@@ -55,6 +59,10 @@ export function CashierPage() {
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
   const [printType, setPrintType] = useState<'ticket' | 'comanda'>('ticket');
   const { user } = useAuthStore();
+
+  // Recent sales state
+  const [recentSales, setRecentSales] = useState<Order[]>([]);
+  const [showRecentSales, setShowRecentSales] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -120,6 +128,20 @@ export function CashierPage() {
     }
   };
 
+  const loadRecentSales = async () => {
+    try {
+      // Get completed orders from today
+      const today = new Date().toISOString().split('T')[0];
+      const salesData = await ordersApi.getAll({
+        status: 'completed',
+        fromDate: today
+      });
+      setRecentSales(salesData.slice(0, 20)); // Last 20 sales
+    } catch (error) {
+      console.error('Error loading recent sales:', error);
+    }
+  };
+
   const handleTakeOrder = async (order: Order) => {
     try {
       await ordersApi.updateStatus(order.id, 'in_cashier');
@@ -175,15 +197,21 @@ export function CashierPage() {
 
   const handlePrint = (type: 'ticket' | 'comanda', order?: Order) => {
     const target = order || selectedOrder || orderToPrint;
-    if (!target) return;
+    if (!target) {
+      console.error('No order to print');
+      showToast.error('No hay pedido para imprimir');
+      return;
+    }
 
+    console.log('Preparing to print:', { type, orderId: target.id, tenant: user?.tenant });
     setOrderToPrint(target);
     setPrintType(type);
 
-    // Small delay to ensure state update and render
+    // Increased delay to ensure state update and render
     setTimeout(() => {
+      console.log('Calling window.print()');
       window.print();
-    }, 100);
+    }, 300);
   };
 
   const handleCancelOrder = async (orderId: string) => {
@@ -268,6 +296,19 @@ export function CashierPage() {
             >
               {soundEnabled ? '🔊' : '🔇'}
               {soundEnabled ? 'Sonido ON' : 'Habilitar Sonido'}
+            </button>
+
+            <button
+              onClick={() => {
+                setShowRecentSales(!showRecentSales);
+                if (!showRecentSales) {
+                  loadRecentSales();
+                }
+              }}
+              className={`btn-secondary text-sm flex items-center gap-2 ${showRecentSales ? 'bg-blue-100 border-blue-300' : ''}`}
+              title="Ver últimas ventas"
+            >
+              📋 {showRecentSales ? 'Ocultar' : 'Últimas Ventas'}
             </button>
 
             <button
@@ -567,6 +608,105 @@ export function CashierPage() {
             total={selectedOrder.total}
             onConfirm={handleProcessPayment}
           />
+        )}
+
+        {/* Recent Sales Modal */}
+        {showRecentSales && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 no-print">
+            <div className="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 max-h-[80vh] flex flex-col">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-xl font-semibold">Últimas Ventas de Hoy</h3>
+                <button
+                  onClick={() => setShowRecentSales(false)}
+                  className="p-2 hover:bg-gray-100 rounded-lg"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto">
+                {recentSales.length === 0 ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <p>No hay ventas registradas hoy</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {recentSales.map((sale) => (
+                      <div
+                        key={sale.id}
+                        className="card hover:shadow-md transition-shadow"
+                      >
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-xs font-mono text-gray-500">
+                                #{sale.id.slice(0, 8).toUpperCase()}
+                              </span>
+                              <span className="text-sm text-gray-600">
+                                {new Date(sale.created_at).toLocaleTimeString('es-MX')}
+                              </span>
+                              <span className="text-sm font-medium text-gray-700">
+                                {sale.user?.name}
+                              </span>
+                            </div>
+
+                            <div className="flex flex-wrap gap-2 text-sm text-gray-600">
+                              {sale.order_items?.slice(0, 3).map((item: any) => (
+                                <span key={item.id} className="bg-gray-100 px-2 py-1 rounded">
+                                  {item.quantity}x {item.product.name}
+                                </span>
+                              ))}
+                              {sale.order_items?.length > 3 && (
+                                <span className="text-gray-500">
+                                  +{sale.order_items.length - 3} más
+                                </span>
+                              )}
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <div className="text-right">
+                              <p className="text-lg font-bold text-primary-600">
+                                ${sale.total.toFixed(2)}
+                              </p>
+                              <p className="text-xs text-gray-500 capitalize">
+                                {sale.payment_method === 'cash' ? 'Efectivo' :
+                                  sale.payment_method === 'card' ? 'Tarjeta' :
+                                    sale.payment_method === 'transfer' ? 'Transferencia' :
+                                      sale.payment_method === 'mixed' ? 'Mixto' :
+                                        sale.payment_method}
+                              </p>
+                            </div>
+
+                            <button
+                              onClick={() => {
+                                handlePrint('ticket', sale);
+                                setShowRecentSales(false);
+                              }}
+                              className="btn-primary flex items-center gap-2"
+                              title="Imprimir ticket"
+                            >
+                              <Printer className="w-4 h-4" />
+                              Imprimir
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-4 pt-4 border-t">
+                <button
+                  onClick={() => setShowRecentSales(false)}
+                  className="btn-secondary w-full"
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>

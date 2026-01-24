@@ -100,13 +100,27 @@
   }
 
   @media print {
-    body {
-      background: white !important;
+
+    /* Configuración para impresoras térmicas de 80mm */
+    @page {
+      size: 80mm auto;
       margin: 0;
-      padding: 0;
     }
 
-    .no-print {
+    body {
+      background: white !important;
+      margin: 0 !important;
+      padding: 0 !important;
+      width: 80mm;
+    }
+
+    /* Ocultar todo excepto el contenido de impresión */
+    body * {
+      visibility: hidden !important;
+    }
+
+    .no-print,
+    .no-print * {
       display: none !important;
     }
 
@@ -114,10 +128,27 @@
       display: block !important;
     }
 
-    /* Reset for thermal printers */
-    @page {
-      margin: 0;
-      size: auto;
+    /* Mostrar solo el contenido del ticket */
+    .print-content,
+    .print-content * {
+      visibility: visible !important;
+    }
+
+    .print-content {
+      position: absolute !important;
+      left: 0 !important;
+      top: 0 !important;
+      display: block !important;
+      width: 80mm !important;
+      max-width: 80mm !important;
+      margin: 0 !important;
+      background: white !important;
+    }
+
+    /* Asegurar que el contenedor del ticket sea visible */
+    [class*="print"] {
+      display: block !important;
+      visibility: visible !important;
     }
   }
 }
