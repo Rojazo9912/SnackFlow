@@ -133,6 +133,64 @@ export const categoriesApi = {
   toggleActive: (id: string) => api.patch<any>(`/categories/${id}/toggle-active`),
 };
 
+// Offline Queue Logic
+const OFFLINE_QUEUE_KEY = 'sf_offline_queue';
+
+export const offlineService = {
+  getQueue: () => JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'),
+
+  addToQueue: (orderData: any) => {
+    const queue = offlineService.getQueue();
+    const offlineOrder = {
+      ...orderData,
+      tempId: `OFFLINE-${Date.now()}`,
+      timestamp: new Date().toISOString(),
+    };
+    queue.push(offlineOrder);
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+    return {
+      id: offlineOrder.tempId,
+      ...orderData,
+      created_at: offlineOrder.timestamp,
+      status: 'pending',
+      total: orderData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0), // Simple total calculation
+      is_offline: true,
+      user: { name: 'Offline User' }, // Placeholder
+      order_items: orderData.items.map((item: any, index: number) => ({
+        id: `OFFLINE-ITEM-${Date.now()}-${index}`,
+        ...item,
+        product: { name: item.name || 'Producto Offline' }
+      }))
+    };
+  },
+
+  sync: async () => {
+    if (!navigator.onLine) return;
+
+    const queue = offlineService.getQueue();
+    if (queue.length === 0) return;
+
+    console.log(`Syncing ${queue.length} offline orders...`);
+    const remainingQueue = [];
+    let syncedCount = 0;
+
+    for (const order of queue) {
+      try {
+        await api.post('/orders', order);
+        syncedCount++;
+      } catch (error) {
+        console.error('Error syncing order:', order, error);
+        remainingQueue.push(order); // Keep in queue if fails
+      }
+    }
+
+    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remainingQueue));
+    if (syncedCount > 0) {
+      window.dispatchEvent(new CustomEvent('offline-sync-complete', { detail: { count: syncedCount } }));
+    }
+  }
+};
+
 // Orders
 export const ordersApi = {
   getAll: (params?: { status?: string; fromDate?: string; toDate?: string }) => {
@@ -146,8 +204,21 @@ export const ordersApi = {
   getPending: () => api.get<any[]>('/orders/pending'),
   getMyOrders: () => api.get<any[]>('/orders/my-orders'),
   getOne: (id: string) => api.get<any>(`/orders/${id}`),
-  create: (data: { items: { productId: string; quantity: number; notes?: string }[]; notes?: string }) =>
-    api.post<any>('/orders', data),
+  create: async (data: { items: { productId: string; quantity: number; notes?: string; price?: number; name?: string }[]; notes?: string }) => {
+    if (!navigator.onLine) {
+      console.log('Offline mode: Queuing order');
+      return offlineService.addToQueue(data);
+    }
+    try {
+      return await api.post<any>('/orders', data);
+    } catch (error) {
+      // If network error, try offline queue
+      if (!navigator.onLine) {
+        return offlineService.addToQueue(data);
+      }
+      throw error;
+    }
+  },
   updateStatus: (id: string, status: string, reason?: string) =>
     api.patch<any>(`/orders/${id}/status`, { status, reason }),
   processPayment: (

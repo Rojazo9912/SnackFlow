@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuthStore } from './stores/authStore';
+import { api, offlineService } from './services/api';
 import { useCapacitor } from './hooks/useCapacitor';
 import { useGlobalKeyboardShortcuts } from './hooks/useGlobalKeyboardShortcuts';
 import { Layout } from './components/Layout';
@@ -32,6 +33,23 @@ function App() {
   useGlobalKeyboardShortcuts({
     onShowHelp: () => setShowShortcutsHelp(true),
   });
+
+  // Sync offline orders
+  useEffect(() => {
+    const handleOnline = () => {
+      // Small delay to ensure connection is stable
+      setTimeout(() => {
+        offlineService.sync();
+      }, 2000);
+    };
+
+    window.addEventListener('online', handleOnline);
+    // Try to sync on mount
+    if (navigator.onLine) {
+      offlineService.sync();
+    }
+    return () => window.removeEventListener('online', handleOnline);
+  }, []);
 
   return (
     <>

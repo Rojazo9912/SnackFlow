@@ -611,12 +611,33 @@ export function CashierPage() {
                   <label className="block text-sm font-medium mb-1">
                     Monto recibido
                   </label>
+
+                  {/* Smart Denominations */}
+                  <div className="grid grid-cols-4 gap-2 mb-3">
+                    <button
+                      onClick={() => setAmountReceived(selectedOrder.total.toString())}
+                      className="px-2 py-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 transition-colors"
+                    >
+                      Exacto
+                    </button>
+                    {[20, 50, 100, 200, 500, 1000].map((amount) => (
+                      <button
+                        key={amount}
+                        onClick={() => setAmountReceived(amount.toString())}
+                        className="px-2 py-1 text-xs font-medium bg-white hover:bg-green-50 text-green-700 border border-green-200 rounded transition-colors"
+                      >
+                        ${amount}
+                      </button>
+                    ))}
+                  </div>
+
                   <input
                     type="number"
                     value={amountReceived}
                     onChange={(e) => setAmountReceived(e.target.value)}
-                    className="input"
+                    className="input text-lg font-bold"
                     placeholder="0.00"
+                    autoFocus
                   />
                   {amountReceived && calculateChange() >= 0 && (
                     <p className="text-lg font-semibold text-green-600 mt-2">
