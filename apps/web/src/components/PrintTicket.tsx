@@ -11,7 +11,22 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         if (!data) return null;
 
         const settings = tenant?.settings || {};
-        const paymentDetails = data.payment_details ? JSON.parse(data.payment_details) : null;
+
+        // Safe JSON parsing - handle both string and object
+        let paymentDetails = null;
+        if (data.payment_details) {
+            if (typeof data.payment_details === 'string') {
+                try {
+                    paymentDetails = JSON.parse(data.payment_details);
+                } catch (error) {
+                    console.error('Error parsing payment_details:', error);
+                    paymentDetails = null;
+                }
+            } else {
+                // Already an object
+                paymentDetails = data.payment_details;
+            }
+        }
 
         const renderTicket = () => (
             <div className="print-content text-black font-mono text-[11px] leading-tight w-[80mm] p-3">

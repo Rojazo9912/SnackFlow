@@ -35,12 +35,27 @@ export const showBrowserNotification = (title: string, options?: NotificationOpt
     return null;
 };
 
-export const playNotificationSound = () => {
+export const playNotificationSound = async () => {
     try {
         const audio = new Audio('/notification.mp3');
-        audio.volume = 0.5;
-        audio.play().catch(err => console.warn('Could not play sound:', err));
+        audio.volume = 0.7; // Increased volume for better audibility
+
+        // Try to play the sound
+        const playPromise = audio.play();
+
+        if (playPromise !== undefined) {
+            playPromise
+                .then(() => {
+                    console.log('✅ Notification sound played successfully');
+                })
+                .catch(err => {
+                    // Browser blocked autoplay
+                    console.warn('⚠️ Could not play sound (autoplay blocked):', err.message);
+                    console.log('💡 User interaction required to enable sound');
+                });
+        }
     } catch (error) {
-        console.warn('Error playing notification sound:', error);
+        console.warn('❌ Error playing notification sound:', error);
     }
 };
+
