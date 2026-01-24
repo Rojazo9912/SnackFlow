@@ -5,6 +5,8 @@ interface KeyboardShortcutConfig {
     onNewSale?: () => void;
     onSearch?: () => void;
     onOpenCashRegister?: () => void;
+    onProcessPayment?: () => void;
+    onReprintTicket?: () => void;
     onShowHelp?: () => void;
 }
 
@@ -63,6 +65,30 @@ export function useGlobalKeyboardShortcuts(config: KeyboardShortcutConfig = {}) 
                 event.preventDefault();
                 if (config.onShowHelp) {
                     config.onShowHelp();
+                }
+            }
+
+            // F3 - New Sale (Clear cart)
+            if (event.key === 'F3') {
+                event.preventDefault();
+                if (config.onNewSale) {
+                    config.onNewSale();
+                }
+            }
+
+            // F4 - Process Payment
+            if (event.key === 'F4') {
+                event.preventDefault();
+                if (config.onProcessPayment) {
+                    config.onProcessPayment();
+                }
+            }
+
+            // F9 - Reprint Last Ticket
+            if (event.key === 'F9') {
+                event.preventDefault();
+                if (config.onReprintTicket) {
+                    config.onReprintTicket();
                 }
             }
 

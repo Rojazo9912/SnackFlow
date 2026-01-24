@@ -18,6 +18,7 @@ import { EmptyState } from '../components/EmptyState';
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../utils/notifications';
 import { MixedPaymentModal } from '../components/MixedPaymentModal';
+import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 
 interface Order {
   id: string;
@@ -91,6 +92,45 @@ export function CashierPage() {
       });
       // Refresh orders list
       loadOrders();
+    },
+  });
+
+  // Keyboard shortcuts
+  useGlobalKeyboardShortcuts({
+    onOpenCashRegister: () => {
+      if (!cashSession) {
+        const amount = prompt('Monto inicial de caja:');
+        if (!amount) return;
+        cashRegisterApi.open(parseFloat(amount))
+          .then(() => {
+            showToast.success('Caja abierta');
+            loadData();
+          })
+          .catch((error: any) => {
+            showToast.error(error.message || 'Error abriendo caja');
+          });
+      }
+    },
+    onProcessPayment: () => {
+      if (selectedOrder && cashSession) {
+        setShowPaymentModal(true);
+      }
+    },
+    onReprintTicket: () => {
+      const lastTicket = localStorage.getItem('lastPrintedTicket');
+      if (!lastTicket) {
+        showToast.warning('No hay ticket anterior para reimprimir');
+        return;
+      }
+      try {
+        const ticketData = JSON.parse(lastTicket);
+        setOrderToPrint(ticketData);
+        setPrintType('ticket');
+        setTimeout(() => window.print(), 100);
+        showToast.success('Reimprimiendo último ticket');
+      } catch (error) {
+        showToast.error('Error al reimprimir ticket');
+      }
     },
   });
 
@@ -188,6 +228,14 @@ export function CashierPage() {
       setShowMixedPayment(false);
       setAmountReceived('');
       loadOrders();
+
+      // Check for auto-print setting
+      if ((user?.tenant?.settings as any)?.autoPrintTickets) {
+        setTimeout(() => {
+          console.log('Auto-printing ticket...');
+          window.print();
+        }, 500);
+      }
     } catch (error: any) {
       showToast.error(error.message || 'Error procesando pago');
     } finally {

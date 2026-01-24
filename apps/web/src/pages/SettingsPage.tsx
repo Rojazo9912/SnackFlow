@@ -21,6 +21,7 @@ export function SettingsPage() {
     logo: '',
     ticketHeader: '',
     ticketFooter: '',
+    autoPrintTickets: false,
   });
 
   useEffect(() => {
@@ -39,6 +40,7 @@ export function SettingsPage() {
         logo: data.settings?.logo || '',
         ticketHeader: data.settings?.ticketHeader || '',
         ticketFooter: data.settings?.ticketFooter || '',
+        autoPrintTickets: data.settings?.autoPrintTickets || false,
       });
     } catch (error) {
       showToast.error('Error cargando configuracion');
@@ -64,7 +66,7 @@ export function SettingsPage() {
     setSaving(true);
 
     try {
-      const { address, phone, logo, ticketHeader, ticketFooter, ...tenantData } = formData;
+      const { address, phone, logo, ticketHeader, ticketFooter, autoPrintTickets, ...tenantData } = formData;
       const updated = await tenantsApi.update({
         ...tenantData,
         settings: {
@@ -74,6 +76,7 @@ export function SettingsPage() {
           logo,
           ticketHeader,
           ticketFooter,
+          autoPrintTickets,
         }
       });
       setTenant(updated);
@@ -245,6 +248,19 @@ export function SettingsPage() {
                   className="input"
                   placeholder="Síguenos en @redes_sociales"
                 />
+              </div>
+
+              <div className="flex items-center gap-2 pt-2">
+                <input
+                  type="checkbox"
+                  id="autoPrintTickets"
+                  checked={formData.autoPrintTickets}
+                  onChange={(e) => setFormData({ ...formData, autoPrintTickets: e.target.checked })}
+                  className="w-4 h-4 text-primary-600 rounded focus:ring-primary-500 border-gray-300"
+                />
+                <label htmlFor="autoPrintTickets" className="text-sm font-medium text-gray-700 select-none cursor-pointer">
+                  Imprimir ticket automáticamente al completar venta
+                </label>
               </div>
             </div>
           </div>

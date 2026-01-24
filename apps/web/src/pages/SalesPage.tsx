@@ -5,6 +5,7 @@ import { useCartStore } from '../stores/cartStore';
 import { productsApi, categoriesApi, ordersApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
+import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 
 interface Product {
   id: string;
@@ -53,18 +54,6 @@ export function SalesPage() {
     loadData();
   }, []);
 
-  // Handle Ctrl+F to focus search
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.ctrlKey && e.key === 'f') {
-        e.preventDefault();
-        searchInputRef.current?.focus();
-      }
-    };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
   const loadData = async () => {
     try {
       const [productsData, categoriesData] = await Promise.all([
@@ -99,6 +88,58 @@ export function SalesPage() {
     }
 
     return true; // "Todos"
+  });
+
+  // Handle keyboard shortcuts for search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+F to focus search
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+
+      // Esc to clear search (only when search input is focused)
+      if (e.key === 'Escape' && document.activeElement === searchInputRef.current) {
+        setSearch('');
+        searchInputRef.current?.blur();
+      }
+
+      // Enter to add first product (only when search input is focused and has results)
+      if (e.key === 'Enter' && document.activeElement === searchInputRef.current && filteredProducts.length > 0) {
+        e.preventDefault();
+        const firstProduct = filteredProducts[0];
+        const currentQuantity = items.find(i => i.productId === firstProduct.id)?.quantity || 0;
+        const availableStock = getAvailableStock(firstProduct);
+
+        if (currentQuantity >= availableStock) {
+          showToast.warning(`Stock insuficiente. Solo hay ${availableStock} disponibles`);
+          return;
+        }
+
+        addItem({
+          id: firstProduct.id,
+          name: firstProduct.name,
+          price: firstProduct.price,
+        });
+        setSearch(''); // Clear search after adding
+        searchInputRef.current?.focus(); // Keep focus for next search
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [search, filteredProducts, items, addItem]);
+
+  // Global keyboard shortcuts
+  useGlobalKeyboardShortcuts({
+    onNewSale: () => {
+      if (items.length > 0) {
+        if (confirm('¿Limpiar el carrito y comenzar una nueva venta?')) {
+          clearCart();
+          showToast.success('Carrito limpiado');
+        }
+      }
+    },
   });
 
   const handleSendOrder = async () => {
