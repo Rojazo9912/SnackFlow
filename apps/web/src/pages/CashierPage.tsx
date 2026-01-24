@@ -47,6 +47,9 @@ export function CashierPage() {
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
 
+  // Sound state
+  const [soundEnabled, setSoundEnabled] = useState(false);
+
   // Printing state
   const printRef = useRef<HTMLDivElement>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
@@ -236,6 +239,27 @@ export function CashierPage() {
         subtitle={`${orders.length} pedidos en cola`}
         actions={
           <div className="flex gap-2">
+            {/* Enable Sound Button */}
+            <button
+              onClick={async () => {
+                try {
+                  const audio = new Audio('/notification.mp3');
+                  audio.volume = 0.1; // Low volume for test
+                  await audio.play();
+                  setSoundEnabled(true);
+                  showToast.success('🔊 Sonido de notificaciones habilitado');
+                } catch (error) {
+                  showToast.error('No se pudo habilitar el sonido');
+                }
+              }}
+              className={`btn-secondary text-sm flex items-center gap-2 ${soundEnabled ? 'bg-green-100 border-green-300' : ''
+                }`}
+              title="Habilitar sonido de notificaciones"
+            >
+              {soundEnabled ? '🔊' : '🔇'}
+              {soundEnabled ? 'Sonido ON' : 'Habilitar Sonido'}
+            </button>
+
             <button
               onClick={() => {
                 const lastTicket = localStorage.getItem('lastPrintedTicket');
