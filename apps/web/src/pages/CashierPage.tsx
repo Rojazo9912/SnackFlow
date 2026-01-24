@@ -19,6 +19,7 @@ import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../utils/notifications';
 import { MixedPaymentModal } from '../components/MixedPaymentModal';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
+import { playSound } from '../utils/notifications';
 
 interface Order {
   id: string;
@@ -233,6 +234,7 @@ export function CashierPage() {
       localStorage.setItem('lastPrintedTicket', JSON.stringify(ticketData));
 
       showToast.success('Pago procesado correctamente');
+      playSound('success');
       setSelectedOrder(null);
       setShowPaymentModal(false);
       setShowMixedPayment(false);
@@ -248,6 +250,7 @@ export function CashierPage() {
       }
     } catch (error: any) {
       showToast.error(error.message || 'Error procesando pago');
+      playSound('error');
     } finally {
       setProcessingPayment(false);
     }
