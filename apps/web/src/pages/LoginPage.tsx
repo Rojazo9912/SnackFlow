@@ -18,9 +18,9 @@ export function LoginPage() {
 
   const loadTenantInfo = async () => {
     try {
-      // Get slug from subdomain or use default 'demo'
+      // Get slug from subdomain or use default tenant
       const hostname = window.location.hostname;
-      const slug = hostname.includes('localhost') ? 'demo' : hostname.split('.')[0];
+      const slug = hostname.includes('localhost') ? 'Ice-Cream-Shop' : hostname.split('.')[0];
       const info = await tenantsApi.getPublic(slug);
       setTenantInfo(info);
     } catch (error) {
