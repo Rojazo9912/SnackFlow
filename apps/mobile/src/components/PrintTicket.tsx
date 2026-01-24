@@ -282,7 +282,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         return (
             <div
                 ref={ref}
-                className="fixed left-[-9999px] top-0 print:left-0 print:top-0 print:relative"
+                className="fixed left-[-9999px] top-0 print:left-0 print:top-0 print:absolute z-50"
                 style={{ width: '80mm' }}
             >
                 {type === 'ticket' && renderTicket()}
