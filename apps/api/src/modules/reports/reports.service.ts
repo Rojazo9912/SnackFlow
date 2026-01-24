@@ -313,4 +313,54 @@ export class ReportsService {
 
     return workbook.xlsx.writeBuffer();
   }
+
+  // New methods for dashboard charts
+  async getSalesTrend(tenantId: string, days = 7) {
+    const trend = [];
+    const today = new Date();
+
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      const dateStr = date.toISOString().split('T')[0];
+
+      const sales = await this.getDailySales(tenantId, dateStr);
+      trend.push({
+        date: dateStr,
+        total: sales.totalSales,
+        orders: sales.ticketCount,
+      });
+    }
+
+    return trend;
+  }
+
+  async getKPIs(tenantId: string) {
+    const [todaySales, comparison, lowStock, pendingOrders] = await Promise.all([
+      this.getDailySales(tenantId),
+      this.getSalesComparison(tenantId),
+      this.getLowStockCount(tenantId),
+      this.getPendingOrdersCount(tenantId),
+    ]);
+
+    return {
+      todaySales: todaySales.totalSales,
+      averageTicket: todaySales.averageTicket,
+      lowStockProducts: lowStock,
+      pendingOrders,
+      yesterdaySales: comparison.yesterday.totalSales,
+      percentChange: comparison.percentChange,
+    };
+  }
+
+  private async getPendingOrdersCount(tenantId: string): Promise<number> {
+    const { data, error } = await this.supabase
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', tenantId)
+      .eq('status', 'pending');
+
+    if (error) return 0;
+    return data?.length || 0;
+  }
 }

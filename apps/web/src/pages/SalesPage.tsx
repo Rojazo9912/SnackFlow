@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Search, Plus, Minus, Trash2, Send, Star } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { useCartStore } from '../stores/cartStore';
@@ -35,6 +35,7 @@ export function SalesPage() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
     items,
@@ -50,6 +51,18 @@ export function SalesPage() {
 
   useEffect(() => {
     loadData();
+  }, []);
+
+  // Handle Ctrl+F to focus search
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   const loadData = async () => {
@@ -136,8 +149,9 @@ export function SalesPage() {
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
               <input
-                type="text"
-                placeholder="Buscar producto..."
+                ref={searchInputRef}
+                type="search"
+                placeholder="Buscar producto... (Ctrl+F)"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="input pl-10"

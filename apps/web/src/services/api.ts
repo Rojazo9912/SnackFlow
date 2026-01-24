@@ -182,6 +182,8 @@ export const reportsApi = {
   getTopProducts: (days = 7, limit = 10) =>
     api.get<any>(`/reports/top-products?days=${days}&limit=${limit}`),
   getComparison: () => api.get<any>('/reports/comparison'),
+  getSalesTrend: (days = 7) => api.get<any>(`/reports/sales-trend?days=${days}`),
+  getKPIs: () => api.get<any>('/reports/kpis'),
   exportDailySales: async (params?: { date?: string; format?: 'excel' | 'pdf' }) => {
     const searchParams = new URLSearchParams();
     if (params?.date) searchParams.set('date', params.date);

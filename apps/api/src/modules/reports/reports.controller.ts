@@ -59,6 +59,22 @@ export class ReportsController {
     return this.reportsService.getSalesComparison(tenantId);
   }
 
+  @Get('sales-trend')
+  @ApiOperation({ summary: 'Obtener tendencia de ventas' })
+  @ApiQuery({ name: 'days', required: false, type: Number, description: 'Número de días (default: 7)' })
+  async getSalesTrend(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('days') days?: number,
+  ) {
+    return this.reportsService.getSalesTrend(tenantId, days);
+  }
+
+  @Get('kpis')
+  @ApiOperation({ summary: 'Obtener KPIs del dashboard' })
+  async getKPIs(@CurrentUser('tenantId') tenantId: string) {
+    return this.reportsService.getKPIs(tenantId);
+  }
+
   @Get('daily-sales/export')
   @ApiOperation({ summary: 'Exportar ventas del dia' })
   @ApiQuery({ name: 'date', required: false })

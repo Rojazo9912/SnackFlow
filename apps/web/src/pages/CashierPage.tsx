@@ -135,12 +135,17 @@ export function CashierPage() {
       );
 
       // Prepare for printing
-      setOrderToPrint({
+      const ticketData = {
         ...selectedOrder,
         payment_method: paymentData.length === 1 ? paymentData[0].method : 'mixed',
         payment_details: { payments: paymentData, amountReceived: received, change }
-      } as any);
+      } as any;
+
+      setOrderToPrint(ticketData);
       setPrintType('ticket');
+
+      // Save last ticket to localStorage for reprint
+      localStorage.setItem('lastPrintedTicket', JSON.stringify(ticketData));
 
       showToast.success('Pago procesado correctamente');
       setSelectedOrder(null);
@@ -230,24 +235,49 @@ export function CashierPage() {
         title="Caja"
         subtitle={`${orders.length} pedidos en cola`}
         actions={
-          <button
-            onClick={async () => {
-              const amount = prompt('Monto final contado:');
-              if (!amount) return;
-              try {
-                const result = await cashRegisterApi.close(parseFloat(amount));
-                showToast.success(
-                  `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
-                );
-                loadData();
-              } catch (error: any) {
-                showToast.error(error.message || 'Error cerrando caja');
-              }
-            }}
-            className="btn-secondary text-sm"
-          >
-            Cerrar Caja
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                const lastTicket = localStorage.getItem('lastPrintedTicket');
+                if (!lastTicket) {
+                  showToast.warning('No hay ticket anterior para reimprimir');
+                  return;
+                }
+                try {
+                  const ticketData = JSON.parse(lastTicket);
+                  setOrderToPrint(ticketData);
+                  setPrintType('ticket');
+                  setTimeout(() => window.print(), 100);
+                  showToast.success('Reimprimiendo último ticket');
+                } catch (error) {
+                  showToast.error('Error al reimprimir ticket');
+                }
+              }}
+              className="btn-secondary text-sm flex items-center gap-2"
+              title="Reimprimir último ticket"
+            >
+              <Printer className="w-4 h-4" />
+              Reimprimir
+            </button>
+            <button
+              onClick={async () => {
+                const amount = prompt('Monto final contado:');
+                if (!amount) return;
+                try {
+                  const result = await cashRegisterApi.close(parseFloat(amount));
+                  showToast.success(
+                    `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
+                  );
+                  loadData();
+                } catch (error: any) {
+                  showToast.error(error.message || 'Error cerrando caja');
+                }
+              }}
+              className="btn-secondary text-sm"
+            >
+              Cerrar Caja
+            </button>
+          </div>
         }
       />
 
