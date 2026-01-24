@@ -12,6 +12,7 @@ import { CashRegisterModule } from './modules/cash-register/cash-register.module
 import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
 import { FilesModule } from './modules/files/files.module';
+import { AttributesModule } from './modules/attributes/attributes.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { FilesModule } from './modules/files/files.module';
     UsersModule,
     CategoriesModule,
     ProductsModule,
+    AttributesModule,
     OrdersModule,
     InventoryModule,
     CashRegisterModule,

@@ -3,6 +3,7 @@ import {
   Get,
   Post,
   Patch,
+  Delete,
   Param,
   Body,
   Query,
@@ -12,6 +13,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger'
 import { ProductsService } from './products.service';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
+import { CreateVariantDto } from './dto/create-variant.dto';
+import { UpdateVariantDto } from './dto/update-variant.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles, Role } from '../../common/decorators/roles.decorator';
@@ -22,7 +25,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('products')
 export class ProductsController {
-  constructor(private readonly productsService: ProductsService) {}
+  constructor(private readonly productsService: ProductsService) { }
 
   @Get()
   @ApiOperation({ summary: 'Listar todos los productos' })
@@ -146,5 +149,50 @@ export class ProductsController {
   ) {
     const stock = await this.productsService.calculateCompositeStock(tenantId, id);
     return { calculatedStock: stock };
+  }
+
+  // ==========================================
+  // VARIANT ENDPOINTS (for products with variants)
+  // ==========================================
+
+  @Get(':id/variants')
+  @ApiOperation({ summary: 'Obtener variantes de un producto' })
+  async getVariants(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.productsService.getVariants(id, tenantId);
+  }
+
+  @Post(':id/variants')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Crear una variante de producto' })
+  async createVariant(
+    @Param('id') id: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() createVariantDto: CreateVariantDto,
+  ) {
+    return this.productsService.createVariant(id, tenantId, createVariantDto);
+  }
+
+  @Patch(':id/variants/:variantId')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Actualizar una variante de producto' })
+  async updateVariant(
+    @Param('variantId') variantId: string,
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() updateVariantDto: UpdateVariantDto,
+  ) {
+    return this.productsService.updateVariant(variantId, tenantId, updateVariantDto);
+  }
+
+  @Delete(':id/variants/:variantId')
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Eliminar una variante de producto' })
+  async deleteVariant(
+    @Param('variantId') variantId: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.productsService.deleteVariant(variantId, tenantId);
   }
 }

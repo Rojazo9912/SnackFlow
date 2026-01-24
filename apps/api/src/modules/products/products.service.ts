@@ -4,6 +4,8 @@ import { SUPABASE_CLIENT } from '../../database/database.module';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { ProductIngredientDto } from './dto/product-ingredient.dto';
+import { CreateVariantDto } from './dto/create-variant.dto';
+import { UpdateVariantDto } from './dto/update-variant.dto';
 
 @Injectable()
 export class ProductsService {
@@ -348,5 +350,139 @@ export class ProductsService {
     }
 
     return data ?? 0;
+  }
+
+  // ==========================================
+  // VARIANT METHODS (for products with variants)
+  // ==========================================
+
+  async getVariants(productId: string, tenantId: string) {
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .select('*')
+      .eq('product_id', productId)
+      .eq('tenant_id', tenantId)
+      .order('created_at');
+
+    if (error) {
+      throw new BadRequestException(`Error fetching variants: ${error.message}`);
+    }
+
+    return data || [];
+  }
+
+  async createVariant(productId: string, tenantId: string, dto: CreateVariantDto) {
+    // Verify product exists and belongs to tenant
+    await this.findOne(productId, tenantId);
+
+    // Generate SKU if not provided
+    const sku = dto.sku || `${productId.substring(0, 8)}-${Date.now()}`;
+
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .insert({
+        product_id: productId,
+        tenant_id: tenantId,
+        sku,
+        price: dto.price,
+        stock: dto.stock,
+        min_stock: dto.min_stock || 0,
+        attributes: dto.attributes,
+        active: dto.active !== undefined ? dto.active : true,
+      })
+      .select()
+      .single();
+
+    if (error) {
+      throw new BadRequestException(`Error creating variant: ${error.message}`);
+    }
+
+    return data;
+  }
+
+  async updateVariant(variantId: string, tenantId: string, dto: UpdateVariantDto) {
+    const updateData: any = {};
+
+    if (dto.sku !== undefined) updateData.sku = dto.sku;
+    if (dto.price !== undefined) updateData.price = dto.price;
+    if (dto.stock !== undefined) updateData.stock = dto.stock;
+    if (dto.min_stock !== undefined) updateData.min_stock = dto.min_stock;
+    if (dto.attributes !== undefined) updateData.attributes = dto.attributes;
+    if (dto.active !== undefined) updateData.active = dto.active;
+
+    updateData.updated_at = new Date().toISOString();
+
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .update(updateData)
+      .eq('id', variantId)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new NotFoundException(`Variant not found or update failed`);
+    }
+
+    return data;
+  }
+
+  async deleteVariant(variantId: string, tenantId: string) {
+    // Check if variant is in use in pending orders
+    const { data: orderItems } = await this.supabase
+      .from('order_items')
+      .select('id, order:orders!inner(status)')
+      .eq('variant_id', variantId)
+      .in('order.status', ['pending', 'preparing'])
+      .limit(1);
+
+    if (orderItems && orderItems.length > 0) {
+      throw new BadRequestException(
+        'Cannot delete variant that is in use by pending orders',
+      );
+    }
+
+    const { error } = await this.supabase
+      .from('product_variants')
+      .delete()
+      .eq('id', variantId)
+      .eq('tenant_id', tenantId);
+
+    if (error) {
+      throw new BadRequestException(`Error deleting variant: ${error.message}`);
+    }
+
+    return { message: 'Variant deleted successfully' };
+  }
+
+  async getVariantStock(variantId: string): Promise<number> {
+    const { data, error } = await this.supabase
+      .from('product_variants')
+      .select('stock')
+      .eq('id', variantId)
+      .single();
+
+    if (error || !data) {
+      return 0;
+    }
+
+    return data.stock;
+  }
+
+  async decrementVariantStock(variantId: string, quantity: number) {
+    const currentStock = await this.getVariantStock(variantId);
+
+    if (currentStock < quantity) {
+      throw new BadRequestException('Insufficient variant stock');
+    }
+
+    const { error } = await this.supabase
+      .from('product_variants')
+      .update({ stock: currentStock - quantity })
+      .eq('id', variantId);
+
+    if (error) {
+      throw new BadRequestException(`Error updating variant stock: ${error.message}`);
+    }
   }
 }

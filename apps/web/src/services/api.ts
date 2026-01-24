@@ -101,7 +101,28 @@ export const productsApi = {
   updateIngredients: (id: string, ingredients: { ingredientId: string; quantity: number }[]) =>
     api.patch<any>(`/products/${id}/ingredients`, { ingredients }),
   getCalculatedStock: (id: string) => api.get<any>(`/products/${id}/calculated-stock`),
+  // Variants
+  getVariants: (id: string) => api.get<any[]>(`/products/${id}/variants`),
+  createVariant: (id: string, data: any) => api.post<any>(`/products/${id}/variants`, data),
+  updateVariant: (productId: string, variantId: string, data: any) =>
+    api.patch<any>(`/products/${productId}/variants/${variantId}`, data),
+  deleteVariant: (productId: string, variantId: string) =>
+    api.delete<any>(`/products/${productId}/variants/${variantId}`),
 };
+
+// Attributes
+export const attributesApi = {
+  getAll: () => api.get<any[]>('/attributes'),
+  create: (data: { name: string; display_order?: number }) =>
+    api.post<any>('/attributes', data),
+  update: (id: string, data: { name?: string; display_order?: number }) =>
+    api.patch<any>(`/attributes/${id}`, data),
+  delete: (id: string) => api.delete<any>(`/attributes/${id}`),
+  createValue: (data: { attribute_id: string; value: string; display_order?: number }) =>
+    api.post<any>('/attributes/values', data),
+  deleteValue: (id: string) => api.delete<any>(`/attributes/values/${id}`),
+};
+
 
 // Categories
 export const categoriesApi = {
