@@ -4,6 +4,22 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
+  // Base path para Capacitor
+  base: './',
+
+  // Optimizaciones para mobile
+  build: {
+    outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: false,
+    minify: 'terser',
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
+
   plugins: [
     react(),
     VitePWA({
