@@ -1,7 +1,0 @@
-<?xml version='1.0' encoding='utf-8'?>
-<resources>
-    <string name="app_name">SnackFlow</string>
-    <string name="title_activity_main">SnackFlow</string>
-    <string name="package_name">com.snackflow.pos</string>
-    <string name="custom_url_scheme">com.snackflow.pos</string>
-</resources>

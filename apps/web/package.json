@@ -9,23 +9,9 @@
     "start": "serve -s dist -l $PORT",
     "preview": "vite preview",
     "lint": "eslint .",
-    "clean": "rimraf dist",
-    "cap:sync": "cap sync",
-    "cap:android": "cap open android",
-    "cap:ios": "cap open ios",
-    "mobile:build": "pnpm build && cap sync",
-    "mobile:android": "pnpm mobile:build && cap open android",
-    "mobile:ios": "pnpm mobile:build && cap open ios"
+    "clean": "rimraf dist"
   },
   "dependencies": {
-    "@capacitor/android": "^6.2.0",
-    "@capacitor/app": "^6.0.0",
-    "@capacitor/core": "^6.2.0",
-    "@capacitor/haptics": "^6.0.0",
-    "@capacitor/ios": "^6.2.0",
-    "@capacitor/keyboard": "^6.0.0",
-    "@capacitor/splash-screen": "^6.0.0",
-    "@capacitor/status-bar": "^6.0.0",
     "@supabase/supabase-js": "^2.47.10",
     "lucide-react": "^0.469.0",
     "react": "^18.3.1",
@@ -37,7 +23,6 @@
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@capacitor/cli": "^6.2.0",
     "@types/react": "^18.3.18",
     "@types/react-dom": "^18.3.5",
     "@vitejs/plugin-react": "^4.3.4",
