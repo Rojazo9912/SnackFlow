@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PrintTicketProps {
     type: 'ticket' | 'comanda' | 'report' | 'drawer';
@@ -289,17 +290,20 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
             </div>
         );
 
-        return (
+        return createPortal(
             <div
                 ref={ref}
-                className="fixed left-[-9999px] top-0 print:left-0 print:top-0 print:absolute z-50"
-                style={{ width: '80mm' }}
+                className="print-content fixed left-0 top-0 w-[80mm] bg-white z-[9999]"
+                style={{ visibility: 'hidden' }} // Hidden on screen, visible on print via CSS rule
             >
-                {type === 'ticket' && renderTicket()}
-                {type === 'comanda' && renderComanda()}
-                {type === 'report' && renderReport()}
-                {type === 'drawer' && renderDrawerKick()}
-            </div>
+                <div className="visible-print-only">
+                    {type === 'ticket' && renderTicket()}
+                    {type === 'comanda' && renderComanda()}
+                    {type === 'report' && renderReport()}
+                    {type === 'drawer' && renderDrawerKick()}
+                </div>
+            </div>,
+            document.body
         );
     }
 );

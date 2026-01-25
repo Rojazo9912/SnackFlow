@@ -101,24 +101,6 @@
 
   @media print {
 
-    /* Configuración para impresoras térmicas de 80mm */
-    @page {
-      size: 80mm auto;
-      margin: 0;
-    }
-
-    body {
-      background: white !important;
-      margin: 0 !important;
-      padding: 0 !important;
-      width: 80mm;
-    }
-
-    /* Ocultar elementos que no deben imprimirse */
-    .no-print {
-      display: none !important;
-    }
-
     /* Mostrar solo el contenido del ticket con máxima prioridad */
     .print-content {
       position: absolute !important;
@@ -132,45 +114,46 @@
       padding: 0 !important;
       background: white !important;
       color: black !important;
+      z-index: 9999 !important;
     }
 
+    /* Asegurar que el contenido dentro también sea visible */
     .print-content * {
       visibility: visible !important;
       color: black !important;
     }
 
-    /* Ocultar todo lo demás */
-    body>*:not(.print-content):not(script):not(style) {
+    /* Ocultar todo lo demás solo si no estamos dentro de print-content */
+    body>*:not(.print-content) {
       display: none !important;
     }
+
+    /* Responsive font sizes for better mobile experience */
+    @media screen and (max-width: 640px) {
+      html {
+        font-size: clamp(14px, 3.5vw, 16px);
+      }
+
+      .card {
+        @apply p-3;
+      }
+
+      .btn {
+        @apply px-3 py-2.5 text-base;
+        min-height: 44px;
+        /* Mejor para touch */
+      }
+    }
+
+    @media screen and (min-width: 641px) and (max-width: 1024px) {
+      html {
+        font-size: 15px;
+      }
+    }
+
+    @media screen and (min-width: 1025px) {
+      html {
+        font-size: 16px;
+      }
+    }
   }
-
-  /* Responsive font sizes for better mobile experience */
-  @media screen and (max-width: 640px) {
-    html {
-      font-size: clamp(14px, 3.5vw, 16px);
-    }
-
-    .card {
-      @apply p-3;
-    }
-
-    .btn {
-      @apply px-3 py-2.5 text-base;
-      min-height: 44px;
-      /* Mejor para touch */
-    }
-  }
-
-  @media screen and (min-width: 641px) and (max-width: 1024px) {
-    html {
-      font-size: 15px;
-    }
-  }
-
-  @media screen and (min-width: 1025px) {
-    html {
-      font-size: 16px;
-    }
-  }
-}
