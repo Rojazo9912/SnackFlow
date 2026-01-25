@@ -114,41 +114,63 @@
       width: 80mm;
     }
 
-    /* Ocultar todo excepto el contenido de impresión */
-    body * {
-      visibility: hidden !important;
-    }
-
-    .no-print,
-    .no-print * {
+    /* Ocultar elementos que no deben imprimirse */
+    .no-print {
       display: none !important;
     }
 
-    .print-only {
-      display: block !important;
-    }
-
-    /* Mostrar solo el contenido del ticket */
-    .print-content,
-    .print-content * {
-      visibility: visible !important;
-    }
-
+    /* Mostrar solo el contenido del ticket con máxima prioridad */
     .print-content {
       position: absolute !important;
       left: 0 !important;
       top: 0 !important;
       display: block !important;
+      visibility: visible !important;
       width: 80mm !important;
       max-width: 80mm !important;
       margin: 0 !important;
+      padding: 0 !important;
       background: white !important;
+      color: black !important;
     }
 
-    /* Asegurar que el contenedor del ticket sea visible */
-    [class*="print"] {
-      display: block !important;
+    .print-content * {
       visibility: visible !important;
+      color: black !important;
+    }
+
+    /* Ocultar todo lo demás */
+    body>*:not(.print-content):not(script):not(style) {
+      display: none !important;
+    }
+  }
+
+  /* Responsive font sizes for better mobile experience */
+  @media screen and (max-width: 640px) {
+    html {
+      font-size: clamp(14px, 3.5vw, 16px);
+    }
+
+    .card {
+      @apply p-3;
+    }
+
+    .btn {
+      @apply px-3 py-2.5 text-base;
+      min-height: 44px;
+      /* Mejor para touch */
+    }
+  }
+
+  @media screen and (min-width: 641px) and (max-width: 1024px) {
+    html {
+      font-size: 15px;
+    }
+  }
+
+  @media screen and (min-width: 1025px) {
+    html {
+      font-size: 16px;
     }
   }
 }
