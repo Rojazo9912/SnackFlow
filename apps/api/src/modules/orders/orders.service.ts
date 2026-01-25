@@ -67,7 +67,12 @@ export class OrdersService {
     }
 
     if (options?.toDate) {
-      query = query.lte('created_at', options.toDate);
+      // If the date string is just YYYY-MM-DD, we want to include the whole day
+      // so we set the time to 23:59:59
+      const toDate = options.toDate.includes(':')
+        ? options.toDate
+        : `${options.toDate} 23:59:59`;
+      query = query.lte('created_at', toDate);
     }
 
     const { data, error } = await query;
