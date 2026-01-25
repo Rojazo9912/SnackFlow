@@ -12,11 +12,25 @@ interface Shortcut {
 }
 
 const shortcuts: Shortcut[] = [
+    // Caja
+    { keys: ['Ctrl', 'O'], description: 'Abrir caja', category: 'Caja' },
+    { keys: ['F2'], description: 'Procesar pago del pedido seleccionado', category: 'Caja' },
+    { keys: ['F9'], description: 'Reimprimir último ticket', category: 'Caja' },
+    { keys: ['F10'], description: 'Abrir cajón de dinero', category: 'Caja' },
+
+    // Navegación
     { keys: ['Ctrl', 'N'], description: 'Nueva venta', category: 'Navegación' },
     { keys: ['Ctrl', 'F'], description: 'Buscar producto', category: 'Navegación' },
-    { keys: ['F2'], description: 'Abrir/Cerrar caja', category: 'Caja' },
+    { keys: ['↑', '↓'], description: 'Navegar entre pedidos', category: 'Navegación' },
+    { keys: ['Enter'], description: 'Seleccionar pedido', category: 'Navegación' },
+
+    // Ventas
+    { keys: ['Ctrl', 'P'], description: 'Imprimir comanda', category: 'Ventas' },
+    { keys: ['Ctrl', 'S'], description: 'Guardar pedido', category: 'Ventas' },
+
+    // General
+    { keys: ['F1'], description: 'Mostrar esta ayuda', category: 'General' },
     { keys: ['Esc'], description: 'Cerrar modal', category: 'General' },
-    { keys: ['Ctrl', '/'], description: 'Mostrar esta ayuda', category: 'General' },
 ];
 
 export function KeyboardShortcutsHelp({ isOpen, onClose }: KeyboardShortcutsHelpProps) {

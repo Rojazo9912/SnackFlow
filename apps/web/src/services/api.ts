@@ -276,6 +276,7 @@ export const reportsApi = {
   getComparison: () => api.get<any>('/reports/comparison'),
   getSalesTrend: (days = 7) => api.get<any>(`/reports/sales-trend?days=${days}`),
   getKPIs: () => api.get<any>('/reports/kpis'),
+  getCashSessionSummary: (sessionId: string) => api.get<any>(`/reports/cash-session/${sessionId}/summary`),
   exportDailySales: async (params?: { date?: string; format?: 'excel' | 'pdf' }) => {
     const searchParams = new URLSearchParams();
     if (params?.date) searchParams.set('date', params.date);

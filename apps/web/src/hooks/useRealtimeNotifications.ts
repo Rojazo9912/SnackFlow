@@ -20,6 +20,16 @@ export function useRealtimeNotifications({ onNewOrder, enabled = true }: Realtim
                 { event: 'INSERT', schema: 'public', table: 'orders', filter: 'status=eq.pending' },
                 (payload: any) => onNewOrder?.(payload.new)
             )
+            .on('postgres_changes',
+                { event: 'UPDATE', schema: 'public', table: 'products' },
+                (payload: any) => {
+                    const newProduct = payload.new;
+                    if (newProduct.stock <= newProduct.min_stock) {
+                        // Dispatch custom event for low stock to be handled by global toast or header
+                        window.dispatchEvent(new CustomEvent('low-stock-alert', { detail: newProduct }));
+                    }
+                }
+            )
             .subscribe();
 
         channelRef.current = channel;

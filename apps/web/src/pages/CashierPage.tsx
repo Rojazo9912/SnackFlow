@@ -9,7 +9,7 @@ import {
 } from 'lucide-react';
 import { useRef } from 'react';
 import { showToast } from '../utils/toast';
-import { ordersApi, cashRegisterApi, tenantsApi } from '../services/api';
+import { ordersApi, cashRegisterApi, tenantsApi, reportsApi } from '../services/api';
 import { PrintTicket } from '../components/PrintTicket';
 import { Printer } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
@@ -20,6 +20,9 @@ import { requestNotificationPermission, showBrowserNotification, playNotificatio
 import { MixedPaymentModal } from '../components/MixedPaymentModal';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 import { playSound } from '../utils/notifications';
+import { KeyboardShortcutsHelp } from '../components/KeyboardShortcutsHelp';
+import { CashSummaryWidget } from '../components/CashSummaryWidget';
+import { TicketPreviewModal } from '../components/TicketPreviewModal';
 
 interface Order {
   id: string;
@@ -59,12 +62,18 @@ export function CashierPage() {
   // Printing state
   const printRef = useRef<HTMLDivElement>(null);
   const [orderToPrint, setOrderToPrint] = useState<Order | null>(null);
-  const [printType, setPrintType] = useState<'ticket' | 'comanda' | 'drawer'>('ticket');
+  const [printType, setPrintType] = useState<'ticket' | 'comanda' | 'drawer' | 'report'>('ticket');
   const { user } = useAuthStore();
 
   // Recent sales state
   const [recentSales, setRecentSales] = useState<Order[]>([]);
   const [showRecentSales, setShowRecentSales] = useState(false);
+
+  // Help modal state
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+
+  // Ticket preview state
+  const [showTicketPreview, setShowTicketPreview] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -79,7 +88,6 @@ export function CashierPage() {
   useRealtimeNotifications({
     enabled: !!cashSession,
     onNewOrder: (order) => {
-      console.log('New order notification:', order);
       // Play sound
       playNotificationSound();
       // Show toast
@@ -145,6 +153,23 @@ export function CashierPage() {
     },
   });
 
+  // F1 for help
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'F1') {
+        e.preventDefault();
+        setShowKeyboardHelp(true);
+      }
+      if (e.key === 'Escape') {
+        setShowKeyboardHelp(false);
+        setShowTicketPreview(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const loadData = async () => {
     try {
       const [ordersData, sessionData, tenantData] = await Promise.all([
@@ -206,11 +231,19 @@ export function CashierPage() {
   const handleProcessPayment = async (payments?: Array<{ method: string; amount: number }>, receivedAmount?: number, changeAmount?: number) => {
     if (!selectedOrder) return;
 
+    // Validation: Check for suspiciously high amounts
+    const received = receivedAmount || (amountReceived ? parseFloat(amountReceived) : undefined);
+    if (received && received > 5000) {
+      const confirm = window.confirm(
+        `El monto recibido ($${received.toFixed(2)}) es muy alto. ¿Es correcto?`
+      );
+      if (!confirm) return;
+    }
+
     setProcessingPayment(true);
     try {
       // If no payments array provided, use single payment method
       const paymentData = payments || [{ method: paymentMethod, amount: selectedOrder.total }];
-      const received = receivedAmount || (amountReceived ? parseFloat(amountReceived) : undefined);
       const change = changeAmount || (received && paymentMethod === 'cash' ? received - selectedOrder.total : undefined);
 
       await ordersApi.processPayment(
@@ -241,13 +274,8 @@ export function CashierPage() {
       setAmountReceived('');
       loadOrders();
 
-      // Check for auto-print setting
-      if ((user?.tenant?.settings as any)?.autoPrintTickets) {
-        setTimeout(() => {
-          console.log('Auto-printing ticket...');
-          window.print();
-        }, 500);
-      }
+      // Show ticket preview instead of auto-printing
+      setShowTicketPreview(true);
     } catch (error: any) {
       showToast.error(error.message || 'Error procesando pago');
       playSound('error');
@@ -264,19 +292,25 @@ export function CashierPage() {
       return;
     }
 
-    console.log('Preparing to print:', { type, orderId: target.id, tenant: user?.tenant });
+
+
     setOrderToPrint(target);
     setPrintType(type);
 
     // Increased delay to ensure state update and render
     setTimeout(() => {
-      console.log('Calling window.print()');
       window.print();
     }, 300);
   };
 
   const handleCancelOrder = async (orderId: string) => {
-    const reason = prompt('Motivo de cancelacion:');
+    // Enhanced validation: Confirm cancellation
+    const confirmCancel = window.confirm(
+      '¿Estás seguro de cancelar este pedido? Esta acción no se puede deshacer.'
+    );
+    if (!confirmCancel) return;
+
+    const reason = prompt('Motivo de cancelación:');
     if (!reason) return;
 
     try {
@@ -292,6 +326,45 @@ export function CashierPage() {
   const calculateChange = () => {
     if (!selectedOrder || !amountReceived) return 0;
     return parseFloat(amountReceived) - selectedOrder.total;
+  };
+
+  // Calculate bill breakdown for change
+  const calculateBillBreakdown = (amount: number): { [key: number]: number } => {
+    const bills = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
+    const breakdown: { [key: number]: number } = {};
+    let remaining = Math.round(amount);
+
+    for (const bill of bills) {
+      if (remaining >= bill) {
+        breakdown[bill] = Math.floor(remaining / bill);
+        remaining = remaining % bill;
+      }
+    }
+
+    return breakdown;
+  };
+
+  const handlePrintZReport = async () => {
+    try {
+      const [dailySales, topProductsObj] = await Promise.all([
+        reportsApi.getDailySales(),
+        reportsApi.getTopProducts(1, 5)
+      ]);
+
+      const reportData = {
+        ...dailySales,
+        topProducts: topProductsObj.products,
+        type: 'report'
+      };
+
+      setOrderToPrint(reportData as any);
+      setPrintType('report');
+      setTimeout(() => window.print(), 300);
+      showToast.success('Imprimiendo reporte del día...');
+    } catch (error) {
+      console.error(error);
+      showToast.error('Error generando reporte');
+    }
   };
 
   if (loading) {
@@ -390,10 +463,18 @@ export function CashierPage() {
                 }
               }}
               className="btn-secondary text-sm flex items-center gap-2"
-              title="Reimprimir último ticket"
+              title="Reimprimir último ticket (F9)"
             >
               <Printer className="w-4 h-4" />
               Reimprimir
+            </button>
+            <button
+              onClick={handlePrintZReport}
+              className="btn-secondary text-sm flex items-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+              title="Imprimir reporte del día"
+            >
+              <Printer className="w-4 h-4" />
+              Corte Z
             </button>
             <button
               onClick={async () => {
@@ -417,6 +498,12 @@ export function CashierPage() {
         }
       />
 
+      {/* Cash Summary Widget */}
+      {cashSession && (
+        <div className="px-6 mb-4">
+          <CashSummaryWidget sessionId={cashSession.id} />
+        </div>
+      )}
 
       <div className="flex flex-col lg:flex-row gap-4 flex-1 min-h-0 no-print">
         {/* Orders list */}
@@ -569,6 +656,7 @@ export function CashierPage() {
                 <button
                   onClick={() => setShowPaymentModal(true)}
                   className="btn-success flex-1"
+                  title="Cobrar (F2)"
                 >
                   Cobrar
                 </button>
@@ -643,9 +731,26 @@ export function CashierPage() {
                     autoFocus
                   />
                   {amountReceived && calculateChange() >= 0 && (
-                    <p className="text-lg font-semibold text-green-600 mt-2">
-                      Cambio: ${calculateChange().toFixed(2)}
-                    </p>
+                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <p className="text-lg font-bold text-green-700 flex justify-between items-center mb-2">
+                        <span>Cambio:</span>
+                        <span>${calculateChange().toFixed(2)}</span>
+                      </p>
+
+                      {/* Bill Breakdown */}
+                      <div className="flex flex-wrap gap-2 justify-end">
+                        {Object.entries(calculateBillBreakdown(calculateChange()))
+                          .sort((a, b) => Number(b[0]) - Number(a[0]))
+                          .map(([bill, count]) => (
+                            <span
+                              key={bill}
+                              className="inline-flex items-center px-2 py-1 rounded bg-white border border-green-300 text-xs font-medium text-green-800 shadow-sm"
+                            >
+                              <span className="font-bold mr-1">{count}x</span> ${bill}
+                            </span>
+                          ))}
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
@@ -792,6 +897,23 @@ export function CashierPage() {
         ref={printRef}
         type={printType}
         data={orderToPrint}
+        tenant={user?.tenant}
+      />
+
+      {/* Modals */}
+      <KeyboardShortcutsHelp
+        isOpen={showKeyboardHelp}
+        onClose={() => setShowKeyboardHelp(false)}
+      />
+
+      <TicketPreviewModal
+        isOpen={showTicketPreview}
+        onClose={() => setShowTicketPreview(false)}
+        onConfirm={() => {
+          setShowTicketPreview(false);
+          setTimeout(() => window.print(), 300);
+        }}
+        order={orderToPrint}
         tenant={user?.tenant}
       />
     </div>

@@ -1,4 +1,4 @@
-import { Controller, Get, Query, UseGuards, Res } from '@nestjs/common';
+import { Controller, Get, Query, UseGuards, Res, Param } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { ReportsService } from './reports.service';
@@ -73,6 +73,15 @@ export class ReportsController {
   @ApiOperation({ summary: 'Obtener KPIs del dashboard' })
   async getKPIs(@CurrentUser('tenantId') tenantId: string) {
     return this.reportsService.getKPIs(tenantId);
+  }
+
+  @Get('cash-session/:sessionId/summary')
+  @ApiOperation({ summary: 'Obtener resumen de sesion de caja' })
+  async getCashSessionSummary(
+    @Param('sessionId') sessionId: string,
+    @CurrentUser('tenantId') tenantId: string,
+  ) {
+    return this.reportsService.getCashSessionSummary(sessionId, tenantId);
   }
 
   @Get('daily-sales/export')

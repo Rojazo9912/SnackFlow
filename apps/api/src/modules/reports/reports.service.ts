@@ -58,6 +58,59 @@ export class ReportsService {
     };
   }
 
+  async getCashSessionSummary(sessionId: string, tenantId: string) {
+    const { data: orders, error } = await this.supabase
+      .from('orders')
+      .select('id, total, payment_method, payment_details')
+      .eq('tenant_id', tenantId)
+      .eq('cash_register_session_id', sessionId)
+      .eq('status', 'paid');
+
+    if (error) {
+      throw new Error(`Error obteniendo resumen de caja: ${error.message}`);
+    }
+
+    const totalSales = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
+    const transactionCount = orders?.length || 0;
+    const averageTicket = transactionCount > 0 ? totalSales / transactionCount : 0;
+
+    const byPaymentMethod: Record<string, number> = {
+      cash: 0,
+      card: 0,
+      transfer: 0,
+      mixed: 0
+    };
+
+    orders?.forEach((o) => {
+      // Handle mixed payments if payment_details exists
+      if (o.payment_method === 'mixed' && o.payment_details && typeof o.payment_details === 'object') {
+        const details = o.payment_details as any;
+        if (details.payments && Array.isArray(details.payments)) {
+          details.payments.forEach((p: any) => {
+            if (byPaymentMethod[p.method] !== undefined) {
+              byPaymentMethod[p.method] += p.amount || 0;
+            }
+          });
+          byPaymentMethod.mixed += o.total; // Clean tracking of mixed total volume if needed, or just keep individual parts
+          // Actually, for the widget we usually want strict liquidity (cash/card/transfer).
+          // But passing 'mixed' might be useful context.
+        }
+      } else {
+        const method = o.payment_method;
+        if (byPaymentMethod[method] !== undefined) {
+          byPaymentMethod[method] += o.total || 0;
+        }
+      }
+    });
+
+    return {
+      totalSales,
+      transactionCount,
+      averageTicket,
+      byPaymentMethod,
+    };
+  }
+
   async getSalesByHour(tenantId: string, date?: string) {
     const targetDate = date || new Date().toISOString().split('T')[0];
     const startOfDay = `${targetDate}T00:00:00`;

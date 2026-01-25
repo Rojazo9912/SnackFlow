@@ -13,12 +13,14 @@ import {
   LogOut,
   Menu,
   X,
+  History,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
 
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'supervisor'] },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart, roles: ['admin', 'supervisor', 'seller'] },
+  { name: 'Historial', href: '/history', icon: History, roles: ['admin', 'supervisor', 'cashier'] },
   { name: 'Caja', href: '/cashier', icon: CreditCard, roles: ['admin', 'supervisor', 'cashier'] },
   { name: 'Productos', href: '/products', icon: Package, roles: ['admin'] },
   { name: 'Categorias', href: '/categories', icon: FolderTree, roles: ['admin'] },
@@ -54,9 +56,8 @@ export function Layout() {
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${
-          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed inset-y-0 left-0 z-50 w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
       >
         <div className="flex flex-col h-full">
           {/* Logo */}
@@ -78,10 +79,9 @@ export function Layout() {
                 to={item.href}
                 onClick={() => setSidebarOpen(false)}
                 className={({ isActive }) =>
-                  `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
-                    isActive
-                      ? 'bg-primary-100 text-primary-700'
-                      : 'text-gray-600 hover:bg-gray-100'
+                  `flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${isActive
+                    ? 'bg-primary-100 text-primary-700'
+                    : 'text-gray-600 hover:bg-gray-100'
                   }`
                 }
               >

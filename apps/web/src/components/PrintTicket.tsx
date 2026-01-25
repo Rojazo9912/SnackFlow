@@ -167,6 +167,16 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                     {settings.ticketFooter && (
                         <p className="whitespace-pre-wrap mb-2">{settings.ticketFooter}</p>
                     )}
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center my-3">
+                        <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://snackflow.app/invoice/${data.id}`)}`}
+                            alt="QR Facturación"
+                            className="w-20 h-20"
+                        />
+                        <p className="text-[9px] text-gray-400 mt-1">Escanea para facturar</p>
+                    </div>
+
                     <p className="font-bold">¡GRACIAS POR SU COMPRA!</p>
                     <p>www.snackflow.com</p>
                     <p className="text-[10px] text-gray-500 mt-2">
