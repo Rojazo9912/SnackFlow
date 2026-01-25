@@ -10,27 +10,33 @@ export function useCapacitor() {
     const initCapacitor = async () => {
       if (!Capacitor.isNativePlatform()) return;
 
-      // Ocultar splash screen
-      await SplashScreen.hide();
+      try {
+        // Ocultar splash screen
+        await SplashScreen.hide();
 
-      // Configurar status bar
-      await StatusBar.setBackgroundColor({ color: '#f59e0b' });
-      await StatusBar.setStyle({ style: Style.Light });
+        // Configurar status bar
+        await StatusBar.setBackgroundColor({ color: '#f59e0b' });
+        await StatusBar.setStyle({ style: Style.Light });
 
-      // Manejar boton de retroceso en Android
-      App.addListener('backButton', ({ canGoBack }) => {
-        if (canGoBack) {
-          window.history.back();
-        } else {
-          App.exitApp();
-        }
-      });
+        // Manejar boton de retroceso en Android
+        App.addListener('backButton', ({ canGoBack }) => {
+          if (canGoBack) {
+            window.history.back();
+          } else {
+            App.exitApp();
+          }
+        });
+      } catch (error) {
+        console.error('Error initializing Capacitor:', error);
+      }
     };
 
     initCapacitor();
 
     return () => {
-      App.removeAllListeners();
+      if (Capacitor.isNativePlatform()) {
+        App.removeAllListeners();
+      }
     };
   }, []);
 }
@@ -46,7 +52,11 @@ export function useHaptics() {
       heavy: ImpactStyle.Heavy,
     };
 
-    await Haptics.impact({ style: impactStyles[style] });
+    try {
+      await Haptics.impact({ style: impactStyles[style] });
+    } catch (error) {
+      console.error('Haptics error:', error);
+    }
   };
 
   const vibrateSuccess = () => vibrate('light');
