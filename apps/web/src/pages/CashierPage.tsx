@@ -1,14 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import {
   Clock,
-  CreditCard,
-  Banknote,
-  Smartphone,
-  X,
-  Check,
   ArrowLeftRight,
+  X,
 } from 'lucide-react';
-import { useRef } from 'react';
 import { showToast } from '../utils/toast';
 import { ordersApi, cashRegisterApi, tenantsApi, reportsApi } from '../services/api';
 import { PrintTicket } from '../components/PrintTicket';
@@ -25,6 +20,9 @@ import { KeyboardShortcutsHelp } from '../components/KeyboardShortcutsHelp';
 import { CashSummaryWidget } from '../components/CashSummaryWidget';
 import { TicketPreviewModal } from '../components/TicketPreviewModal';
 import { CashMovementModal } from '../components/CashMovementModal';
+import { PaymentModal } from '../components/cashier/PaymentModal';
+import { RecentSalesModal } from '../components/cashier/RecentSalesModal';
+import { OrderDetail } from '../components/cashier/OrderDetail';
 
 interface Order {
   id: string;
@@ -55,8 +53,6 @@ export function CashierPage() {
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showMixedPayment, setShowMixedPayment] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<string>('cash');
-  const [amountReceived, setAmountReceived] = useState<string>('');
 
   // Movement modal state
   const [showMovementModal, setShowMovementModal] = useState(false);
@@ -237,7 +233,7 @@ export function CashierPage() {
     if (!selectedOrder) return;
 
     // Validation: Check for suspiciously high amounts
-    const received = receivedAmount || (amountReceived ? parseFloat(amountReceived) : undefined);
+    const received = receivedAmount;
     if (received && received > 5000) {
       const confirm = window.confirm(
         `El monto recibido ($${received.toFixed(2)}) es muy alto. ¿Es correcto?`
@@ -247,9 +243,10 @@ export function CashierPage() {
 
     setProcessingPayment(true);
     try {
-      // If no payments array provided, use single payment method
-      const paymentData = payments || [{ method: paymentMethod, amount: selectedOrder.total }];
-      const change = changeAmount || (received && paymentMethod === 'cash' ? received - selectedOrder.total : undefined);
+      // If no payments array provided, check if we can infer or error out.
+      // With the new modals, payments should always be provided.
+      const paymentData = payments || [{ method: 'cash', amount: selectedOrder.total }];
+      const change = changeAmount;
 
       await ordersApi.processPayment(
         selectedOrder.id,
@@ -276,7 +273,6 @@ export function CashierPage() {
       setSelectedOrder(null);
       setShowPaymentModal(false);
       setShowMixedPayment(false);
-      setAmountReceived('');
       loadOrders();
 
       // Show ticket preview instead of auto-printing
@@ -296,8 +292,6 @@ export function CashierPage() {
       showToast.error('No hay pedido para imprimir');
       return;
     }
-
-
 
     setOrderToPrint(target);
     setPrintType(type);
@@ -326,27 +320,6 @@ export function CashierPage() {
     } catch (error: any) {
       showToast.error(error.message || 'Error cancelando pedido');
     }
-  };
-
-  const calculateChange = () => {
-    if (!selectedOrder || !amountReceived) return 0;
-    return parseFloat(amountReceived) - selectedOrder.total;
-  };
-
-  // Calculate bill breakdown for change
-  const calculateBillBreakdown = (amount: number): { [key: number]: number } => {
-    const bills = [1000, 500, 200, 100, 50, 20, 10, 5, 2, 1];
-    const breakdown: { [key: number]: number } = {};
-    let remaining = Math.round(amount);
-
-    for (const bill of bills) {
-      if (remaining >= bill) {
-        breakdown[bill] = Math.floor(remaining / bill);
-        remaining = remaining % bill;
-      }
-    }
-
-    return breakdown;
   };
 
   const handlePrintZReport = async () => {
@@ -661,193 +634,23 @@ export function CashierPage() {
 
         {/* Selected order detail */}
         {selectedOrder && (
-          <div className="lg:w-96 bg-white rounded-xl shadow-sm flex flex-col">
-            <div className="p-4 border-b">
-              <div className="flex justify-between items-center">
-                <h2 className="font-semibold">Detalle del Pedido</h2>
-                <button
-                  onClick={() => setSelectedOrder(null)}
-                  className="p-1 hover:bg-gray-100 rounded"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="space-y-3">
-                {selectedOrder.order_items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex justify-between items-center py-2 border-b"
-                  >
-                    <div>
-                      <p className="font-medium">{item.product.name}</p>
-                      <p className="text-sm text-gray-500">
-                        {item.quantity} x ${item.unit_price.toFixed(2)}
-                      </p>
-                    </div>
-                    <span className="font-semibold">
-                      ${(item.quantity * item.unit_price).toFixed(2)}
-                    </span>
-                  </div>
-                ))}
-              </div>
-
-              {selectedOrder.notes && (
-                <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
-                  <p className="text-sm text-yellow-800">
-                    <strong>Nota:</strong> {selectedOrder.notes}
-                  </p>
-                </div>
-              )}
-            </div>
-
-            <div className="p-4 border-t space-y-3">
-              <div className="flex justify-between items-center text-xl font-bold">
-                <span>Total:</span>
-                <span className="text-primary-600">
-                  ${selectedOrder.total.toFixed(2)}
-                </span>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={() => handleCancelOrder(selectedOrder.id)}
-                  className="btn-danger flex-1"
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => setShowPaymentModal(true)}
-                  className="btn-success flex-1"
-                  title="Cobrar (F2)"
-                >
-                  Cobrar
-                </button>
-              </div>
-            </div>
-          </div>
+          <OrderDetail
+            order={selectedOrder}
+            onClose={() => setSelectedOrder(null)}
+            onCancel={handleCancelOrder}
+            onPay={() => setShowPaymentModal(true)}
+          />
         )}
 
         {/* Payment Modal */}
-        {showPaymentModal && selectedOrder && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-xl p-6 w-full max-w-md mx-4">
-              <h3 className="text-lg font-semibold mb-4">Procesar Pago</h3>
-
-              <div className="mb-4">
-                <p className="text-2xl font-bold text-primary-600 text-center">
-                  ${selectedOrder.total.toFixed(2)}
-                </p>
-              </div>
-
-              <div className="grid grid-cols-3 gap-2 mb-4">
-                {[
-                  { id: 'cash', icon: Banknote, label: 'Efectivo' },
-                  { id: 'card', icon: CreditCard, label: 'Tarjeta' },
-                  { id: 'transfer', icon: Smartphone, label: 'Transferencia' },
-                ].map((method) => (
-                  <button
-                    key={method.id}
-                    onClick={() => setPaymentMethod(method.id)}
-                    className={`p-3 rounded-lg border-2 flex flex-col items-center gap-1 transition-colors ${paymentMethod === method.id
-                      ? 'border-primary-500 bg-primary-50'
-                      : 'border-gray-200'
-                      }`}
-                  >
-                    <method.icon className="w-6 h-6" />
-                    <span className="text-xs">{method.label}</span>
-                  </button>
-                ))}
-              </div>
-
-              {paymentMethod === 'cash' && (
-                <div className="mb-4">
-                  <label className="block text-sm font-medium mb-1">
-                    Monto recibido
-                  </label>
-
-                  {/* Smart Denominations */}
-                  <div className="grid grid-cols-4 gap-2 mb-3">
-                    <button
-                      onClick={() => setAmountReceived(selectedOrder.total.toString())}
-                      className="px-2 py-1 text-xs font-bold bg-gray-100 hover:bg-gray-200 rounded border border-gray-300 transition-colors"
-                    >
-                      Exacto
-                    </button>
-                    {[20, 50, 100, 200, 500, 1000].map((amount) => (
-                      <button
-                        key={amount}
-                        onClick={() => setAmountReceived(amount.toString())}
-                        className="px-2 py-1 text-xs font-medium bg-white hover:bg-green-50 text-green-700 border border-green-200 rounded transition-colors"
-                      >
-                        ${amount}
-                      </button>
-                    ))}
-                  </div>
-
-                  <input
-                    type="number"
-                    value={amountReceived}
-                    onChange={(e) => setAmountReceived(e.target.value)}
-                    className="input text-lg font-bold"
-                    placeholder="0.00"
-                    autoFocus
-                  />
-                  {amountReceived && calculateChange() >= 0 && (
-                    <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
-                      <p className="text-lg font-bold text-green-700 flex justify-between items-center mb-2">
-                        <span>Cambio:</span>
-                        <span>${calculateChange().toFixed(2)}</span>
-                      </p>
-
-                      {/* Bill Breakdown */}
-                      <div className="flex flex-wrap gap-2 justify-end">
-                        {Object.entries(calculateBillBreakdown(calculateChange()))
-                          .sort((a, b) => Number(b[0]) - Number(a[0]))
-                          .map(([bill, count]) => (
-                            <span
-                              key={bill}
-                              className="inline-flex items-center px-2 py-1 rounded bg-white border border-green-300 text-xs font-medium text-green-800 shadow-sm"
-                            >
-                              <span className="font-bold mr-1">{count}x</span> ${bill}
-                            </span>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  onClick={() => setShowPaymentModal(false)}
-                  className="btn-secondary py-3"
-                  disabled={processingPayment}
-                >
-                  Cancelar
-                </button>
-                <button
-                  onClick={() => handleProcessPayment()}
-                  disabled={processingPayment || (paymentMethod === 'cash' && (!amountReceived || parseFloat(amountReceived) < selectedOrder.total))}
-                  className="btn-primary py-3 flex items-center justify-center gap-2"
-                >
-                  {processingPayment ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                      Procesando...
-                    </>
-                  ) : (
-                    <>
-                      <Check className="w-5 h-5" />
-                      Confirmar Pago
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+        {selectedOrder && (
+          <PaymentModal
+            isOpen={showPaymentModal}
+            onClose={() => setShowPaymentModal(false)}
+            total={selectedOrder.total}
+            onConfirm={handleProcessPayment}
+            processing={processingPayment}
+          />
         )}
         {/* Mixed Payment Modal */}
         {selectedOrder && (
@@ -860,103 +663,12 @@ export function CashierPage() {
         )}
 
         {/* Recent Sales Modal */}
-        {showRecentSales && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 no-print">
-            <div className="bg-white rounded-xl p-6 w-full max-w-4xl mx-4 max-h-[80vh] flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-semibold">Últimas Ventas de Hoy</h3>
-                <button
-                  onClick={() => setShowRecentSales(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              <div className="flex-1 overflow-y-auto">
-                {recentSales.length === 0 ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <p>No hay ventas registradas hoy</p>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    {recentSales.map((sale) => (
-                      <div
-                        key={sale.id}
-                        className="card hover:shadow-md transition-shadow"
-                      >
-                        <div className="flex items-center justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-xs font-mono text-gray-500">
-                                #{sale.id.slice(0, 8).toUpperCase()}
-                              </span>
-                              <span className="text-sm text-gray-600">
-                                {new Date(sale.created_at).toLocaleTimeString('es-MX')}
-                              </span>
-                              <span className="text-sm font-medium text-gray-700">
-                                {sale.user?.name}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 text-sm text-gray-600">
-                              {sale.order_items?.slice(0, 3).map((item: any) => (
-                                <span key={item.id} className="bg-gray-100 px-2 py-1 rounded">
-                                  {item.quantity}x {item.product.name}
-                                </span>
-                              ))}
-                              {sale.order_items?.length > 3 && (
-                                <span className="text-gray-500">
-                                  +{sale.order_items.length - 3} más
-                                </span>
-                              )}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-3">
-                            <div className="text-right">
-                              <p className="text-lg font-bold text-primary-600">
-                                ${sale.total.toFixed(2)}
-                              </p>
-                              <p className="text-xs text-gray-500 capitalize">
-                                {sale.payment_method === 'cash' ? 'Efectivo' :
-                                  sale.payment_method === 'card' ? 'Tarjeta' :
-                                    sale.payment_method === 'transfer' ? 'Transferencia' :
-                                      sale.payment_method === 'mixed' ? 'Mixto' :
-                                        sale.payment_method}
-                              </p>
-                            </div>
-
-                            <button
-                              onClick={() => {
-                                handlePrint('ticket', sale);
-                                setShowRecentSales(false);
-                              }}
-                              className="btn-primary flex items-center gap-2"
-                              title="Imprimir ticket"
-                            >
-                              <Printer className="w-4 h-4" />
-                              Imprimir
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 pt-4 border-t">
-                <button
-                  onClick={() => setShowRecentSales(false)}
-                  className="btn-secondary w-full"
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+        <RecentSalesModal
+          isOpen={showRecentSales}
+          onClose={() => setShowRecentSales(false)}
+          sales={recentSales}
+          onPrint={handlePrint}
+        />
 
         {/* Print Components */}
         <PrintTicket
