@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 
@@ -9,6 +9,7 @@ interface RealtimeOptions {
 
 export function useRealtimeNotifications({ onNewOrder, enabled = true }: RealtimeOptions = {}) {
     const channelRef = useRef<RealtimeChannel | null>(null);
+    const [isConnected, setIsConnected] = useState(false);
 
     useEffect(() => {
         if (!enabled) return;
@@ -30,14 +31,18 @@ export function useRealtimeNotifications({ onNewOrder, enabled = true }: Realtim
                     }
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') setIsConnected(true);
+            });
 
         channelRef.current = channel;
 
         return () => {
             supabase.removeChannel(channel);
+            channelRef.current = null;
+            setIsConnected(false);
         };
     }, [enabled, onNewOrder]);
 
-    return { isConnected: !!channelRef.current };
+    return { isConnected };
 }
