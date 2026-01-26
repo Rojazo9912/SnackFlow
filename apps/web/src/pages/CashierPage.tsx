@@ -428,6 +428,11 @@ export function CashierPage() {
         `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
       );
       loadData();
+
+      // Auto-print Z Report
+      setTimeout(() => {
+        handlePrintZReport();
+      }, 1000);
     } catch (error: any) {
       console.error(error);
       showToast.error(error.message || 'Error cerrando caja');
