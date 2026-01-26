@@ -9,6 +9,7 @@ import { SUPABASE_CLIENT } from '../../database/database.module';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { ProcessPaymentDto } from './dto/process-payment.dto';
+import { CashRegisterService } from '../cash-register/cash-register.service';
 
 export enum OrderStatus {
   DRAFT = 'draft',
@@ -23,6 +24,7 @@ export class OrdersService {
   constructor(
     @Inject(SUPABASE_CLIENT)
     private readonly supabase: SupabaseClient,
+    private readonly cashRegisterService: CashRegisterService,
   ) { }
 
   async findAll(
@@ -254,6 +256,17 @@ export class OrdersService {
       );
     }
 
+    // Link to current cash session if available
+    let cashSessionId = null;
+    try {
+      const session = await this.cashRegisterService.getCurrentSession(tenantId);
+      if (session) {
+        cashSessionId = session.id;
+      }
+    } catch (e) {
+      // Ignore if no session active or error, just don't link
+    }
+
     // Update order status
     const { error: orderError } = await this.supabase
       .from('orders')
@@ -268,6 +281,7 @@ export class OrdersService {
           change: paymentDto.change,
         }),
         cashier_id: userId,
+        cash_register_session_id: cashSessionId,
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
