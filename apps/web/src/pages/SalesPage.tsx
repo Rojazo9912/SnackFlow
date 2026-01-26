@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List, AlertTriangle } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { useCartStore } from '../stores/cartStore';
 import { productsApi, categoriesApi, ordersApi } from '../services/api';
@@ -7,6 +7,8 @@ import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 import { playSound } from '../utils/notifications';
+
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
 
 interface Product {
   id: string;
@@ -138,6 +140,25 @@ export function SalesPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [search, filteredProducts, items, addItem]);
+
+  // Realtime updates for products
+  useRealtimeNotifications({
+    onProductUpdate: (newProduct: Product) => {
+      setProducts(prev => prev.map(p => p.id === newProduct.id ? { ...p, ...newProduct } : p));
+    }
+  });
+
+  // Listen for low stock alerts
+  useEffect(() => {
+    const handleLowStock = (e: CustomEvent) => {
+      const product = e.detail;
+      showToast.warning(`⚠️ ¡Alerta! Stock bajo para: ${product.name} (${product.stock} restantes)`);
+      playSound('error');
+    };
+
+    window.addEventListener('low-stock-alert', handleLowStock as any);
+    return () => window.removeEventListener('low-stock-alert', handleLowStock as any);
+  }, []);
 
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
@@ -287,9 +308,21 @@ export function SalesPage() {
                       });
                     }}
                     disabled={getAvailableStock(product) <= 0}
-                    className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${getAvailableStock(product) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
-                      }`}
+                    className={`group relative bg-white p-4 rounded-2xl shadow-sm border transaction-all duration-200 text-left
+                      ${getAvailableStock(product) <= 0
+                        ? 'border-gray-200 opacity-50 cursor-not-allowed grayscale'
+                        : getAvailableStock(product) <= 5
+                          ? 'border-red-500 shadow-red-100 ring-1 ring-red-500 hover:shadow-red-200' // Red border for low stock
+                          : 'border-transparent hover:border-primary-500 hover:shadow-md'
+                      }
+                    `}
                   >
+                    {/* Low Stock Warning Badge */}
+                    {getAvailableStock(product) > 0 && getAvailableStock(product) <= 5 && (
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md z-10 animate-bounce">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                    )}
                     <div className="flex flex-col mb-2 flex-1">
                       {product.image ? (
                         <div className="w-full h-32 mb-2 rounded-lg overflow-hidden relative bg-gray-50">
@@ -494,6 +527,6 @@ export function SalesPage() {
           </button>
         </div>
       </div>
-    </div>
+    </div >
   );
 }

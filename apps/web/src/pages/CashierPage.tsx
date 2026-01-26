@@ -80,9 +80,6 @@ export function CashierPage() {
     loadData();
     // Request notification permission on mount
     requestNotificationPermission();
-    // Poll for new orders every 5 seconds
-    const interval = setInterval(loadOrders, 5000);
-    return () => clearInterval(interval);
   }, []);
 
   // Realtime notifications for new orders
@@ -103,6 +100,10 @@ export function CashierPage() {
       // Refresh orders list
       loadOrders();
     },
+    onOrderUpdate: (order) => {
+      // Refresh orders list on any update (cancellation, status change)
+      loadOrders();
+    }
   });
 
   // Keyboard shortcuts

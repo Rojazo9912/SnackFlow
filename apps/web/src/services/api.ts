@@ -145,6 +145,7 @@ export const offlineService = {
       ...orderData,
       tempId: `OFFLINE-${Date.now()}`,
       timestamp: new Date().toISOString(),
+      status: 'pending', // Default status
     };
     queue.push(offlineOrder);
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
@@ -153,15 +154,26 @@ export const offlineService = {
       ...orderData,
       created_at: offlineOrder.timestamp,
       status: 'pending',
-      total: orderData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0), // Simple total calculation
+      total: orderData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
       is_offline: true,
-      user: { name: 'Offline User' }, // Placeholder
+      user: { name: 'Offline User' },
       order_items: orderData.items.map((item: any, index: number) => ({
         id: `OFFLINE-ITEM-${Date.now()}-${index}`,
         ...item,
         product: { name: item.name || 'Producto Offline' }
       }))
     };
+  },
+
+  updateOfflineOrder: (id: string, updates: any) => {
+    const queue = offlineService.getQueue();
+    const index = queue.findIndex((o: any) => o.tempId === id);
+    if (index !== -1) {
+      queue[index] = { ...queue[index], ...updates };
+      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+      return queue[index];
+    }
+    return null;
   },
 
   sync: async () => {
@@ -176,7 +188,20 @@ export const offlineService = {
 
     for (const order of queue) {
       try {
-        await api.post('/orders', order);
+        // 1. Create Order
+        // Prepare data for create (remove offline-specific fields)
+        const createData = {
+          items: order.items,
+          notes: order.notes
+        };
+
+        const createdOrder = await api.post<any>('/orders', createData);
+
+        // 2. If order was paid offline, process payment now
+        if (order.status === 'completed' && order.paymentData) {
+          await api.post<any>(`/orders/${createdOrder.id}/pay`, order.paymentData);
+        }
+
         syncedCount++;
       } catch (error) {
         console.error('Error syncing order:', order, error);
@@ -187,6 +212,8 @@ export const offlineService = {
     localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remainingQueue));
     if (syncedCount > 0) {
       window.dispatchEvent(new CustomEvent('offline-sync-complete', { detail: { count: syncedCount } }));
+      // Reload orders to show synced ones
+      window.dispatchEvent(new CustomEvent('orders-updated'));
     }
   }
 };
@@ -201,9 +228,62 @@ export const ordersApi = {
     const query = searchParams.toString();
     return api.get<any[]>(`/orders${query ? `?${query}` : ''}`);
   },
-  getPending: () => api.get<any[]>('/orders/pending'),
+  getPending: async () => {
+    let onlineOrders: any[] = [];
+    try {
+      if (navigator.onLine) {
+        onlineOrders = await api.get<any[]>('/orders/pending');
+      }
+    } catch (e) {
+      console.warn('Could not fetch online orders', e);
+    }
+
+    // Get offline orders that are pending
+    const offlineQueue = offlineService.getQueue();
+    const offlinePending = offlineQueue
+      .filter((o: any) => o.status === 'pending')
+      .map((o: any) => ({
+        id: o.tempId,
+        ...o,
+        created_at: o.timestamp,
+        status: 'pending',
+        total: o.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
+        is_offline: true,
+        user: { name: 'Offline User' },
+        order_items: o.items.map((item: any, index: number) => ({
+          id: `OFFLINE-ITEM-${Date.now()}-${index}`,
+          ...item,
+          product: { name: item.name || 'Producto Offline' }
+        }))
+      }));
+
+    return [...offlinePending, ...onlineOrders];
+  },
   getMyOrders: () => api.get<any[]>('/orders/my-orders'),
-  getOne: (id: string) => api.get<any>(`/orders/${id}`),
+  getOne: async (id: string) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      const queue = offlineService.getQueue();
+      const order = queue.find((o: any) => o.tempId === id);
+      if (order) {
+        return {
+          id: order.tempId,
+          ...order,
+          created_at: order.timestamp,
+          status: order.status || 'pending',
+          total: order.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
+          is_offline: true,
+          user: { name: 'Offline User' },
+          order_items: order.items.map((item: any, index: number) => ({
+            id: `OFFLINE-ITEM-${Date.now()}-${index}`,
+            ...item,
+            product: { name: item.name || 'Producto Offline' }
+          }))
+        };
+      }
+      throw new Error('Order not found in offline queue');
+    }
+    return api.get<any>(`/orders/${id}`);
+  },
   create: async (data: { items: { productId: string; quantity: number; notes?: string; price?: number; name?: string }[]; notes?: string }) => {
     if (!navigator.onLine) {
       console.log('Offline mode: Queuing order');
@@ -219,19 +299,46 @@ export const ordersApi = {
       throw error;
     }
   },
-  updateStatus: (id: string, status: string, reason?: string) =>
-    api.patch<any>(`/orders/${id}/status`, { status, reason }),
-  processPayment: (
+  updateStatus: async (id: string, status: string, reason?: string) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      offlineService.updateOfflineOrder(id, { status });
+      return { success: true, offline: true };
+    }
+    return api.patch<any>(`/orders/${id}/status`, { status, reason });
+  },
+  processPayment: async (
     id: string,
     payments: Array<{ method: string; amount: number }>,
     amountReceived?: number,
     change?: number
-  ) =>
-    api.post<any>(`/orders/${id}/pay`, {
-      payments,
-      amountReceived,
-      change,
-    }),
+  ) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      // Handle offline payment
+      offlineService.updateOfflineOrder(id, {
+        status: 'completed',
+        paymentData: { payments, amountReceived, change },
+        payments, // Store for UI display if needed
+        change
+      });
+      return { success: true, offline: true };
+    }
+
+    try {
+      return await api.post<any>(`/orders/${id}/pay`, {
+        payments,
+        amountReceived,
+        change,
+      });
+    } catch (error) {
+      // If we are offline but trying to pay an ONLINE order, we can't easily do it 
+      // without complex sync logic (queueing the payment for an existing ID).
+      // For now, only allow offline payment for offline orders.
+      if (!navigator.onLine) {
+        throw new Error('No se puede procesar pago de pedido online sin conexión');
+      }
+      throw error;
+    }
+  },
   cancel: (id: string, reason: string) =>
     api.post<any>(`/orders/${id}/cancel`, { reason }),
 };
