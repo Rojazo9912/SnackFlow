@@ -6,6 +6,7 @@ import {
   Smartphone,
   X,
   Check,
+  ArrowLeftRight,
 } from 'lucide-react';
 import { useRef } from 'react';
 import { showToast } from '../utils/toast';
@@ -23,6 +24,7 @@ import { playSound } from '../utils/notifications';
 import { KeyboardShortcutsHelp } from '../components/KeyboardShortcutsHelp';
 import { CashSummaryWidget } from '../components/CashSummaryWidget';
 import { TicketPreviewModal } from '../components/TicketPreviewModal';
+import { CashMovementModal } from '../components/CashMovementModal';
 
 interface Order {
   id: string;
@@ -55,6 +57,9 @@ export function CashierPage() {
   const [showMixedPayment, setShowMixedPayment] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('cash');
   const [amountReceived, setAmountReceived] = useState<string>('');
+
+  // Movement modal state
+  const [showMovementModal, setShowMovementModal] = useState(false);
 
   // Sound state
   const [soundEnabled, setSoundEnabled] = useState(false);
@@ -541,6 +546,14 @@ export function CashierPage() {
               Reimprimir
             </button>
             <button
+              onClick={() => setShowMovementModal(true)}
+              className="btn-secondary text-sm flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-700 border-blue-200"
+              title="Registrar entrada/salida de dinero"
+            >
+              <ArrowLeftRight className="w-4 h-4" />
+              Movimientos
+            </button>
+            <button
               onClick={handlePrintZReport}
               className="btn-secondary text-sm flex items-center gap-2 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
               title="Imprimir reporte del día"
@@ -803,33 +816,35 @@ export function CashierPage() {
                 </div>
               )}
 
-              <div className="flex gap-2">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   onClick={() => setShowPaymentModal(false)}
-                  className="btn-secondary flex-1"
+                  className="btn-secondary py-3"
+                  disabled={processingPayment}
                 >
                   Cancelar
                 </button>
                 <button
                   onClick={() => handleProcessPayment()}
-                  disabled={
-                    processingPayment ||
-                    (paymentMethod === 'cash' &&
-                      (!amountReceived ||
-                        parseFloat(amountReceived) < selectedOrder.total))
-                  }
-                  className="btn-success flex-1 flex items-center justify-center gap-2"
+                  disabled={processingPayment || (paymentMethod === 'cash' && (!amountReceived || parseFloat(amountReceived) < selectedOrder.total))}
+                  className="btn-primary py-3 flex items-center justify-center gap-2"
                 >
-                  <Check className="w-5 h-5" />
-                  {processingPayment ? 'Procesando...' : 'Confirmar'}
+                  {processingPayment ? (
+                    <>
+                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                      Procesando...
+                    </>
+                  ) : (
+                    <>
+                      <Check className="w-5 h-5" />
+                      Confirmar Pago
+                    </>
+                  )}
                 </button>
               </div>
             </div>
           </div>
         )}
-        {/* Printing Component */}
-
-
         {/* Mixed Payment Modal */}
         {selectedOrder && (
           <MixedPaymentModal
@@ -938,32 +953,43 @@ export function CashierPage() {
             </div>
           </div>
         )}
+
+        {/* Print Components */}
+        <PrintTicket
+          ref={printRef}
+          type={printType}
+          data={orderToPrint}
+          tenant={user?.tenant}
+        />
+
+        {/* Ticket Preview Modal */}
+        <TicketPreviewModal
+          isOpen={showTicketPreview}
+          onClose={() => setShowTicketPreview(false)}
+          order={orderToPrint}
+          tenant={user?.tenant}
+          onConfirm={() => {
+            setShowTicketPreview(false);
+            setTimeout(() => window.print(), 300);
+          }}
+        />
+
+        {/* Cash Movement Modal */}
+        <CashMovementModal
+          isOpen={showMovementModal}
+          onClose={() => setShowMovementModal(false)}
+          onSuccess={() => {
+            setCashSession({ ...cashSession });
+            loadData();
+          }}
+        />
+
+        {/* Keyboard Shortcuts Help Modal */}
+        <KeyboardShortcutsHelp
+          isOpen={showKeyboardHelp}
+          onClose={() => setShowKeyboardHelp(false)}
+        />
       </div>
-
-      {/* Printing Component - Moved outside no-print to ensure visibility */}
-      <PrintTicket
-        ref={printRef}
-        type={printType}
-        data={orderToPrint}
-        tenant={user?.tenant}
-      />
-
-      {/* Modals */}
-      <KeyboardShortcutsHelp
-        isOpen={showKeyboardHelp}
-        onClose={() => setShowKeyboardHelp(false)}
-      />
-
-      <TicketPreviewModal
-        isOpen={showTicketPreview}
-        onClose={() => setShowTicketPreview(false)}
-        onConfirm={() => {
-          setShowTicketPreview(false);
-          setTimeout(() => window.print(), 300);
-        }}
-        order={orderToPrint}
-        tenant={user?.tenant}
-      />
     </div>
   );
 }
