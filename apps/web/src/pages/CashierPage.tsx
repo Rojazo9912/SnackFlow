@@ -389,25 +389,29 @@ export function CashierPage() {
     try {
       showToast.info('Calculando ventas y movimientos...', { duration: 2000 });
 
-      const [summary, movements] = await Promise.all([
-        reportsApi.getCashSessionSummary(cashSession.id),
-        cashRegisterApi.getMovements()
-      ]);
+      // Now getCashSessionSummary returns everything we need including expectedCash
+      const summary = await reportsApi.getCashSessionSummary(cashSession.id);
 
-      const openingAmount = cashSession.opening_amount || 0;
-      const cashSales = summary.byPaymentMethod.cash || 0;
+      if (summary.cashFlow?.expectedCash !== undefined) {
+        expectedTotal = summary.cashFlow.expectedCash;
+        calculationSuccess = true;
+      } else {
+        // Fallback for safety if API hasn't updated yet or old version
+        const movements = await cashRegisterApi.getMovements();
+        const openingAmount = cashSession.opening_amount || 0;
+        const cashSales = summary.byPaymentMethod.cash || 0;
 
-      let movementsTotal = 0;
-      movements.forEach((m: any) => {
-        if (m.type === 'deposit') movementsTotal += m.amount;
-        else if (m.type === 'withdrawal') movementsTotal -= m.amount;
-      });
+        let movementsTotal = 0;
+        movements.forEach((m: any) => {
+          if (m.type === 'deposit') movementsTotal += m.amount;
+          else if (m.type === 'withdrawal') movementsTotal -= m.amount;
+        });
 
-      expectedTotal = openingAmount + cashSales + movementsTotal;
-      calculationSuccess = true;
+        expectedTotal = openingAmount + cashSales + movementsTotal;
+        calculationSuccess = true;
+      }
     } catch (error) {
       console.error('Error calculando total esperado:', error);
-      // Fallback to manual entry if calculation fails
     }
 
     const promptMessage = calculationSuccess

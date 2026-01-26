@@ -59,16 +59,32 @@ export class ReportsService {
   }
 
   async getCashSessionSummary(sessionId: string, tenantId: string) {
-    const { data: orders, error } = await this.supabase
-      .from('orders')
-      .select('id, total, payment_method, payment_details')
-      .eq('tenant_id', tenantId)
-      .eq('cash_register_session_id', sessionId)
-      .eq('status', 'paid');
+    // Run queries in parallel
+    const [ordersResult, sessionResult, movementsResult] = await Promise.all([
+      this.supabase
+        .from('orders')
+        .select('id, total, payment_method, payment_details')
+        .eq('tenant_id', tenantId)
+        .eq('cash_register_session_id', sessionId)
+        .eq('status', 'paid'),
+      this.supabase
+        .from('cash_sessions')
+        .select('opening_amount')
+        .eq('id', sessionId)
+        .single(),
+      this.supabase
+        .from('cash_movements')
+        .select('type, amount')
+        .eq('session_id', sessionId)
+    ]);
 
-    if (error) {
-      throw new Error(`Error obteniendo resumen de caja: ${error.message}`);
+    if (ordersResult.error) {
+      throw new Error(`Error obteniendo ventas: ${ordersResult.error.message}`);
     }
+
+    const orders = ordersResult.data;
+    const openingAmount = sessionResult.data?.opening_amount || 0;
+    const movements = movementsResult.data || [];
 
     const totalSales = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
     const transactionCount = orders?.length || 0;
@@ -91,9 +107,7 @@ export class ReportsService {
               byPaymentMethod[p.method] += p.amount || 0;
             }
           });
-          byPaymentMethod.mixed += o.total; // Clean tracking of mixed total volume if needed, or just keep individual parts
-          // Actually, for the widget we usually want strict liquidity (cash/card/transfer).
-          // But passing 'mixed' might be useful context.
+          byPaymentMethod.mixed += o.total;
         }
       } else {
         const method = o.payment_method;
@@ -103,11 +117,31 @@ export class ReportsService {
       }
     });
 
+    // Calculate movements
+    let deposits = 0;
+    let withdrawals = 0;
+    movements.forEach(m => {
+      if (m.type === 'deposit') deposits += m.amount;
+      if (m.type === 'withdrawal') withdrawals += m.amount;
+    });
+
+    // Calculate Expected Cash
+    // Expected = Opening + Cash Sales + Deposits - Withdrawals
+    const cashSales = byPaymentMethod.cash; // distinct from total sales
+    const expectedCash = openingAmount + cashSales + deposits - withdrawals;
+
     return {
       totalSales,
       transactionCount,
       averageTicket,
       byPaymentMethod,
+      cashFlow: {
+        openingAmount,
+        cashSales,
+        deposits,
+        withdrawals,
+        expectedCash
+      }
     };
   }
 
