@@ -367,6 +367,73 @@ export function CashierPage() {
     }
   };
 
+  const handleCloseRegister = async () => {
+    if (!cashSession) return;
+
+    // Check for pending orders
+    if (orders.length > 0) {
+      const confirmClose = window.confirm(
+        `Hay ${orders.length} pedidos pendientes. ¿Estás seguro de cerrar la caja?`
+      );
+      if (!confirmClose) return;
+    }
+
+    let expectedTotal = 0;
+    let calculationSuccess = false;
+
+    try {
+      showToast.info('Calculando ventas y movimientos...', { duration: 2000 });
+
+      const [summary, movements] = await Promise.all([
+        reportsApi.getCashSessionSummary(cashSession.id),
+        cashRegisterApi.getMovements()
+      ]);
+
+      const openingAmount = cashSession.opening_amount || 0;
+      const cashSales = summary.byPaymentMethod.cash || 0;
+
+      let movementsTotal = 0;
+      movements.forEach((m: any) => {
+        if (m.type === 'deposit') movementsTotal += m.amount;
+        else if (m.type === 'withdrawal') movementsTotal -= m.amount;
+      });
+
+      expectedTotal = openingAmount + cashSales + movementsTotal;
+      calculationSuccess = true;
+    } catch (error) {
+      console.error('Error calculando total esperado:', error);
+      // Fallback to manual entry if calculation fails
+    }
+
+    const promptMessage = calculationSuccess
+      ? `Monto final contado:\n(Esperado: $${expectedTotal.toFixed(2)})`
+      : 'Monto final contado:';
+
+    const defaultValue = calculationSuccess ? expectedTotal.toFixed(2) : '';
+
+    const amountStr = prompt(promptMessage, defaultValue);
+
+    if (!amountStr) return;
+
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount < 0) {
+      showToast.error('Monto inválido');
+      return;
+    }
+
+    try {
+      const result = await cashRegisterApi.close(amount);
+
+      showToast.success(
+        `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
+      );
+      loadData();
+    } catch (error: any) {
+      console.error(error);
+      showToast.error(error.message || 'Error cerrando caja');
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -477,19 +544,7 @@ export function CashierPage() {
               Corte Z
             </button>
             <button
-              onClick={async () => {
-                const amount = prompt('Monto final contado:');
-                if (!amount) return;
-                try {
-                  const result = await cashRegisterApi.close(parseFloat(amount));
-                  showToast.success(
-                    `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
-                  );
-                  loadData();
-                } catch (error: any) {
-                  showToast.error(error.message || 'Error cerrando caja');
-                }
-              }}
+              onClick={handleCloseRegister}
               className="btn-secondary text-sm"
             >
               Cerrar Caja
@@ -513,19 +568,7 @@ export function CashierPage() {
               Cola de Pedidos ({orders.length})
             </h1>
             <button
-              onClick={async () => {
-                const amount = prompt('Monto final contado:');
-                if (!amount) return;
-                try {
-                  const result = await cashRegisterApi.close(parseFloat(amount));
-                  showToast.success(
-                    `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
-                  );
-                  loadData();
-                } catch (error: any) {
-                  showToast.error(error.message || 'Error cerrando caja');
-                }
-              }}
+              onClick={handleCloseRegister}
               className="btn-secondary text-sm"
             >
               Cerrar Caja
