@@ -37,6 +37,12 @@ export class UpdateProductDto {
   @Min(0)
   cost?: number;
 
+  @ApiPropertyOptional({ example: 100 })
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  stock?: number;
+
   @ApiPropertyOptional({ example: 10 })
   @IsNumber()
   @IsOptional()
