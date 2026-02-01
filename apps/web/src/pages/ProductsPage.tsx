@@ -85,7 +85,7 @@ export function ProductsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const data = {
+    const data: any = {
       name: formData.name,
       code: formData.code || undefined,
       price: parseFloat(formData.price),
@@ -97,20 +97,24 @@ export function ProductsPage() {
       unit: formData.unit,
     };
 
+    if (formData.isComposite && !editingProduct) {
+      data.ingredients = ingredients;
+    }
+
     try {
       let productId: string;
       if (editingProduct) {
         await productsApi.update(editingProduct.id, data);
         productId = editingProduct.id;
         showToast.success('Producto actualizado');
+
+        if (formData.isComposite) {
+          await productsApi.updateIngredients(productId, ingredients);
+        }
       } else {
         const newProduct = await productsApi.create(data);
         productId = newProduct.id;
         showToast.success('Producto creado');
-      }
-
-      if (formData.isComposite) {
-        await productsApi.updateIngredients(productId, ingredients);
       }
       setShowModal(false);
       resetForm();
@@ -141,7 +145,11 @@ export function ProductsPage() {
     if (product.is_composite) {
       try {
         const ingredientsData = await productsApi.getIngredients(product.id);
-        setIngredients(ingredientsData);
+        const mappedIngredients = ingredientsData.map((item: any) => ({
+          ingredientId: item.ingredient?.id || item.ingredient?.[0]?.id || item.ingredientId,
+          quantity: item.quantity,
+        }));
+        setIngredients(mappedIngredients);
       } catch (error) {
         showToast.error('Error cargando ingredientes');
       }
