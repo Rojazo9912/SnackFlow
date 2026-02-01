@@ -1,14 +1,18 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List, AlertTriangle } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List, AlertTriangle, Banknote } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { useCartStore } from '../stores/cartStore';
-import { productsApi, categoriesApi, ordersApi } from '../services/api';
+import { productsApi, categoriesApi, ordersApi, tenantsApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 import { playSound } from '../utils/notifications';
 
 import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { PaymentModal } from '../components/cashier/PaymentModal';
+import { TicketPreviewModal } from '../components/TicketPreviewModal';
+import { PrintTicket } from '../components/PrintTicket';
+import { useAuthStore } from '../stores/authStore';
 
 interface Product {
   id: string;
@@ -57,18 +61,31 @@ export function SalesPage() {
 
   const [customerName, setCustomerName] = useState('');
 
+  // Cobrar (direct charge) flow state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTicketPreview, setShowTicketPreview] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [orderToPrint, setOrderToPrint] = useState<any>(null);
+  const { user } = useAuthStore();
+  const printRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, tenantData] = await Promise.all([
         productsApi.getAll({ calculateCompositeStock: true }),
         categoriesApi.getAll(),
+        tenantsApi.getCurrent(),
       ]);
       setProducts(productsData);
       setCategories(categoriesData);
+      if (tenantData && user) {
+        user.tenant = tenantData;
+      }
     } catch (error) {
       showToast.error('Error cargando datos');
     } finally {
@@ -195,6 +212,103 @@ export function SalesPage() {
       showToast.error(error.message || 'Error enviando pedido');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCobrar = async () => {
+    if (items.length === 0) {
+      showToast.warning('Agrega productos al pedido');
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      const order = await ordersApi.create({
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          notes: item.notes,
+        })),
+        notes: customerName ? `[Cliente: ${customerName}] ${notes || ''}` : notes,
+      });
+
+      await ordersApi.updateStatus(order.id, 'in_cashier');
+      setCurrentOrderId(order.id);
+      setShowPaymentModal(true);
+    } catch (error: any) {
+      showToast.error(error.message || 'Error creando pedido');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handleConfirmPayment = async (
+    payments: Array<{ method: string; amount: number }>,
+    receivedAmount?: number,
+    changeAmount?: number
+  ) => {
+    if (!currentOrderId) return;
+
+    setProcessingPayment(true);
+    try {
+      await ordersApi.processPayment(
+        currentOrderId,
+        payments,
+        receivedAmount,
+        changeAmount
+      );
+
+      const ticketData = {
+        id: currentOrderId,
+        total: getTotal(),
+        notes: customerName ? `[Cliente: ${customerName}] ${notes || ''}` : notes,
+        created_at: new Date().toISOString(),
+        user: { name: user?.name || 'Vendedor' },
+        order_items: items.map((item, index) => ({
+          id: `item-${index}`,
+          quantity: item.quantity,
+          unit_price: item.price,
+          product: { name: item.name },
+          notes: item.notes,
+        })),
+        payment_method: payments.length === 1 ? payments[0].method : 'mixed',
+        payment_details: {
+          payments,
+          amountReceived: receivedAmount,
+          change: changeAmount,
+        },
+      };
+
+      setOrderToPrint(ticketData);
+      localStorage.setItem('lastPrintedTicket', JSON.stringify(ticketData));
+
+      showToast.success('Pago procesado correctamente');
+      playSound('success');
+
+      setShowPaymentModal(false);
+      clearCart();
+      setCustomerName('');
+      setCurrentOrderId(null);
+      setShowTicketPreview(true);
+
+      loadData();
+    } catch (error: any) {
+      showToast.error(error.message || 'Error procesando pago');
+      playSound('error');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handlePaymentCancel = async () => {
+    setShowPaymentModal(false);
+    if (currentOrderId) {
+      try {
+        await ordersApi.cancel(currentOrderId, 'Pago cancelado por el operador');
+      } catch (error) {
+        console.warn('No se pudo cancelar la orden:', error);
+      }
+      setCurrentOrderId(null);
     }
   };
 
@@ -442,10 +556,9 @@ export function SalesPage() {
             />
           )}
         </div>
-      </div>
 
-      {/* Cart section */}
-      <div className="lg:w-80 flex flex-col bg-white rounded-xl shadow-sm">
+        {/* Cart section */}
+        <div className="lg:w-72 flex-shrink-0 flex flex-col bg-white rounded-xl shadow-sm">
         <div className="p-4 border-b">
           <h2 className="font-semibold text-lg">
             Pedido ({getItemCount()} items)
@@ -517,16 +630,58 @@ export function SalesPage() {
             <span className="text-primary-600">${getTotal().toFixed(2)}</span>
           </div>
 
-          <button
-            onClick={handleSendOrder}
-            disabled={items.length === 0 || submitting}
-            className="btn-primary w-full py-3 flex items-center justify-center gap-2"
-          >
-            <Send className="w-5 h-5" />
-            {submitting ? 'Enviando...' : 'Enviar a Caja'}
-          </button>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={handleCobrar}
+              disabled={items.length === 0 || submitting || processingPayment}
+              className="w-full py-3 flex items-center justify-center gap-2 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              <Banknote className="w-5 h-5" />
+              {processingPayment ? 'Procesando...' : 'Cobrar'}
+            </button>
+            <button
+              onClick={handleSendOrder}
+              disabled={items.length === 0 || submitting || processingPayment}
+              className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+            >
+              <Send className="w-4 h-4" />
+              {submitting ? 'Enviando...' : 'Enviar a Caja'}
+            </button>
+          </div>
         </div>
       </div>
-    </div >
+      </div>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={handlePaymentCancel}
+        total={getTotal()}
+        onConfirm={handleConfirmPayment}
+        processing={processingPayment}
+      />
+
+      {/* Ticket Preview */}
+      <TicketPreviewModal
+        isOpen={showTicketPreview}
+        onClose={() => setShowTicketPreview(false)}
+        order={orderToPrint}
+        tenant={user?.tenant}
+        onConfirm={() => {
+          setShowTicketPreview(false);
+          setTimeout(() => window.print(), 300);
+        }}
+      />
+
+      {/* Hidden print component */}
+      <div className="hidden print:block">
+        <PrintTicket
+          ref={printRef}
+          type="ticket"
+          data={orderToPrint}
+          tenant={user?.tenant}
+        />
+      </div>
+    </div>
   );
 }
