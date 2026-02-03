@@ -4,13 +4,13 @@ import { showToast } from '../utils/toast';
 import { usersApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
-import { ROLES, ROLE_LABELS } from '@snackflow/shared';
+import { ROLES, ROLE_LABELS, type UserRole } from '@snackflow/shared';
 
 interface User {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: UserRole;
   active: boolean;
 }
 
@@ -266,7 +266,7 @@ export function UsersPage() {
                 <select
                   value={formData.role}
                   onChange={(e) =>
-                    setFormData({ ...formData, role: e.target.value })
+                    setFormData({ ...formData, role: e.target.value as UserRole })
                   }
                   className="input"
                   required

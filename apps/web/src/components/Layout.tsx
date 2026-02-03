@@ -42,7 +42,7 @@ export function Layout() {
   };
 
   const filteredNavigation = navigation.filter(
-    (item) => item.roles.includes(user?.role || '')
+    (item) => user?.role && item.roles.includes(user.role)
   );
 
   return (

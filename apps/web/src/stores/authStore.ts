@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { persist } from 'zustand/middleware';
+import type { UserRole } from '@snackflow/shared';
 
 interface Tenant {
   id: string;
@@ -19,7 +20,7 @@ interface User {
   id: string;
   email: string;
   name: string;
-  role: string;
+  role: UserRole;
   tenant?: Tenant;
 }
 
