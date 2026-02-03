@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
-import { json, urlencoded } from 'express';
+import { json, urlencoded, type Request, type Response, type NextFunction } from 'express';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule, {
@@ -16,7 +16,7 @@ async function bootstrap() {
   app.use(urlencoded({ limit: '10mb', extended: true }));
 
   // Basic request logging
-  app.use((req, res, next) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     const startedAt = Date.now();
     res.on('finish', () => {
       const duration = Date.now() - startedAt;

@@ -23,8 +23,12 @@ import { AttributesModule } from './modules/attributes/attributes.module';
       envFilePath: '../../.env',
     }),
     ThrottlerModule.forRoot({
-      ttl: 60,
-      limit: 200,
+      throttlers: [
+        {
+          ttl: 60,
+          limit: 200,
+        },
+      ],
     }),
     DatabaseModule,
     HealthModule,

@@ -141,7 +141,7 @@ export class CashRegisterService {
     return openingAmount + cashSales + movementsTotal;
   }
 
-  private async getSessionOpenedAt(sessionId: string): Promise<string> {(sessionId: string): Promise<string> {
+  private async getSessionOpenedAt(sessionId: string): Promise<string> {
     const { data } = await this.supabase
       .from('cash_sessions')
       .select('opened_at')
