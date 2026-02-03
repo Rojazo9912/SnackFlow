@@ -23,6 +23,7 @@ import { CashMovementModal } from '../components/CashMovementModal';
 import { PaymentModal } from '../components/cashier/PaymentModal';
 import { RecentSalesModal } from '../components/cashier/RecentSalesModal';
 import { OrderDetail } from '../components/cashier/OrderDetail';
+import { ORDER_STATUS } from '@snackflow/shared';
 
 interface Order {
   id: string;
@@ -222,7 +223,7 @@ export function CashierPage() {
 
   const handleTakeOrder = async (order: Order) => {
     try {
-      await ordersApi.updateStatus(order.id, 'in_cashier');
+      await ordersApi.updateStatus(order.id, ORDER_STATUS.IN_CASHIER);
       setSelectedOrder(order);
       loadOrders();
     } catch (error: any) {

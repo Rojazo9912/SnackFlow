@@ -275,13 +275,15 @@ export class OrdersService {
         payment_method: paymentDto.payments.length === 1
           ? paymentDto.payments[0].method
           : 'mixed',
-        payment_details: JSON.stringify({
+        payment_details: {
           payments: paymentDto.payments,
           amountReceived: paymentDto.amountReceived,
           change: paymentDto.change,
-        }),
+          ...(paymentDto.paymentDetails ? { paymentDetails: paymentDto.paymentDetails } : {}),
+        },
         cashier_id: userId,
         cash_register_session_id: cashSessionId,
+        paid_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
@@ -310,13 +312,17 @@ export class OrdersService {
 
     // Decrease stock for each item
     for (const item of order.order_items) {
-      await this.supabase.rpc('decrease_composite_stock', {
+      const { error: stockError } = await this.supabase.rpc('decrease_composite_stock', {
         p_product_id: item.product.id,
         p_quantity: item.quantity,
         p_tenant_id: tenantId,
         p_user_id: userId,
         p_reason: `Venta - Pedido #${order.id.slice(0, 8)}`,
       });
+
+      if (stockError) {
+        throw new Error(`Error actualizando stock: ${stockError.message}`);
+      }
     }
 
     return this.findOne(id, tenantId);
@@ -329,3 +335,5 @@ export class OrdersService {
     });
   }
 }
+
+

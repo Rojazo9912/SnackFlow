@@ -20,6 +20,7 @@ import { requestNotificationPermission, showBrowserNotification, playNotificatio
 import { MixedPaymentModal } from '../components/MixedPaymentModal';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 import { playSound } from '../utils/notifications';
+import { ORDER_STATUS } from '@snackflow/shared';
 
 interface Order {
   id: string;
@@ -195,7 +196,7 @@ export function CashierPage() {
 
   const handleTakeOrder = async (order: Order) => {
     try {
-      await ordersApi.updateStatus(order.id, 'in_cashier');
+      await ordersApi.updateStatus(order.id, ORDER_STATUS.IN_CASHIER);
       setSelectedOrder(order);
       loadOrders();
     } catch (error: any) {

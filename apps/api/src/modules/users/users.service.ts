@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ConflictException,
 } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../database/database.module';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -61,6 +62,10 @@ export class UsersService {
       throw new Error(`Error creando usuario: ${authError.message}`);
     }
 
+    const hashedPin = createUserDto.pin
+      ? await bcrypt.hash(createUserDto.pin, 10)
+      : null;
+
     // Create user profile
     const { data, error } = await this.supabase
       .from('users')
@@ -70,7 +75,7 @@ export class UsersService {
         email: createUserDto.email,
         name: createUserDto.name,
         role: createUserDto.role,
-        pin: createUserDto.pin,
+        pin: hashedPin,
         active: true,
       })
       .select('id, email, name, role, active, created_at')
@@ -102,9 +107,11 @@ export class UsersService {
   }
 
   async updatePin(id: string, tenantId: string, pin: string) {
+    const hashedPin = await bcrypt.hash(pin, 10);
+
     const { error } = await this.supabase
       .from('users')
-      .update({ pin })
+      .update({ pin: hashedPin })
       .eq('id', id)
       .eq('tenant_id', tenantId);
 
@@ -133,3 +140,6 @@ export class UsersService {
     return data;
   }
 }
+
+
+

@@ -15,6 +15,16 @@ async function bootstrap() {
   app.use(json({ limit: '10mb' }));
   app.use(urlencoded({ limit: '10mb', extended: true }));
 
+  // Basic request logging
+  app.use((req, res, next) => {
+    const startedAt = Date.now();
+    res.on('finish', () => {
+      const duration = Date.now() - startedAt;
+      console.log(`[${req.method}] ${req.originalUrl} ${res.statusCode} - ${duration}ms`);
+    });
+    next();
+  });
+
   // Global prefix
   app.setGlobalPrefix('api');
 
@@ -37,7 +47,7 @@ async function bootstrap() {
         callback(null, true);
       } else {
         console.log('CORS blocked origin:', origin);
-        callback(null, true); // Temporalmente permitir todo para debug
+        callback(null, false);
       }
     },
     credentials: true,
@@ -74,3 +84,5 @@ async function bootstrap() {
 }
 
 bootstrap();
+
+

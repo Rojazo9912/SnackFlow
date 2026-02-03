@@ -4,24 +4,26 @@ Sistema de Punto de Venta (POS) para negocios de snacks y dulcerias.
 
 ## Stack Tecnologico
 
-- **Backend**: NestJS + TypeScript
-- **Frontend**: React + TypeScript + Tailwind CSS + Vite
-- **Base de datos**: PostgreSQL (Supabase)
-- **Autenticacion**: Supabase Auth
-- **Tiempo real**: Supabase Realtime
+- Backend: NestJS + TypeScript
+- Frontend: React + TypeScript + Tailwind CSS + Vite (Web y Mobile)
+- Base de datos: PostgreSQL (Supabase)
+- Autenticacion: Supabase Auth
+- Tiempo real: Supabase Realtime
 
 ## Estructura del Proyecto
 
 ```
 snackflow/
-├── apps/
-│   ├── api/          # Backend NestJS
-│   └── web/          # Frontend React
-├── packages/
-│   └── shared/       # Tipos y constantes compartidas
-├── supabase/
-│   └── schema.sql    # Esquema de base de datos
-└── ...
+|-- apps/
+|   |-- api/      # Backend NestJS
+|   |-- web/      # Frontend React (Web)
+|   `-- mobile/   # Frontend React (Mobile - Capacitor)
+|-- packages/
+|   `-- shared/   # Tipos y constantes compartidas
+|-- supabase/
+|   |-- schema.sql    # Esquema de base de datos
+|   `-- migrations/   # Migraciones adicionales
+`-- ...
 ```
 
 ## Requisitos
@@ -57,9 +59,10 @@ JWT_SECRET=tu-jwt-secret
 
 ### 3. Configurar base de datos
 
-1. Ve a tu proyecto en [Supabase](https://supabase.com)
+1. Ve a tu proyecto en Supabase
 2. Abre el SQL Editor
 3. Ejecuta el contenido de `supabase/schema.sql`
+4. Ejecuta las migraciones de `supabase/migrations/` en orden si aplica
 
 ### 4. Crear usuario de prueba
 
@@ -81,7 +84,7 @@ pnpm dev
 pnpm dev:api
 ```
 
-### Iniciar solo el frontend
+### Iniciar solo el frontend web
 
 ```bash
 pnpm dev:web
@@ -89,9 +92,9 @@ pnpm dev:web
 
 ## URLs
 
-- **Frontend**: http://localhost:5173
-- **API**: http://localhost:3000/api
-- **Swagger Docs**: http://localhost:3000/api/docs
+- Frontend: http://localhost:5173
+- API: http://localhost:3000/api
+- Swagger Docs: http://localhost:3000/api/docs
 
 ## Modulos del Sistema
 
@@ -128,35 +131,10 @@ pnpm dev:web
 
 | Rol | Permisos |
 |-----|----------|
-| **admin** | Acceso total al sistema |
-| **supervisor** | Reportes, inventario, caja, pedidos |
-| **cashier** | Cobrar pedidos, caja |
-| **seller** | Crear pedidos |
-
-## Flujo de Trabajo
-
-```
-Vendedor (Tablet)          Cajero (Caja)
-      │                         │
-      ▼                         │
-┌─────────────┐                 │
-│ Crear pedido│                 │
-└─────────────┘                 │
-      │                         │
-      ▼                         │
-┌─────────────┐    Realtime     │
-│   PENDING   │ ───────────────►│
-└─────────────┘                 │
-                                ▼
-                          ┌─────────────┐
-                          │ IN_CASHIER  │
-                          └─────────────┘
-                                │
-                                ▼
-                          ┌─────────────┐
-                          │    PAID     │
-                          └─────────────┘
-```
+| admin | Acceso total al sistema |
+| supervisor | Reportes, inventario, caja, pedidos |
+| cashier | Cobrar pedidos, caja |
+| seller | Crear pedidos |
 
 ## Build para Produccion
 

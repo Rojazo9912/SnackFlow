@@ -13,6 +13,7 @@ import { PaymentModal } from '../components/cashier/PaymentModal';
 import { TicketPreviewModal } from '../components/TicketPreviewModal';
 import { PrintTicket } from '../components/PrintTicket';
 import { useAuthStore } from '../stores/authStore';
+import { ORDER_STATUS } from '@snackflow/shared';
 
 interface Product {
   id: string;
@@ -232,7 +233,7 @@ export function SalesPage() {
         notes: customerName ? `[Cliente: ${customerName}] ${notes || ''}` : notes,
       });
 
-      await ordersApi.updateStatus(order.id, 'in_cashier');
+      await ordersApi.updateStatus(order.id, ORDER_STATUS.IN_CASHIER);
       setCurrentOrderId(order.id);
       setShowPaymentModal(true);
     } catch (error: any) {

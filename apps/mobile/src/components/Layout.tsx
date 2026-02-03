@@ -15,17 +15,18 @@ import {
   X,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
+import { ROLES } from '@snackflow/shared';
 
 const navigation = [
-  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['admin', 'supervisor'] },
-  { name: 'Ventas', href: '/sales', icon: ShoppingCart, roles: ['admin', 'supervisor', 'seller'] },
-  { name: 'Caja', href: '/cashier', icon: CreditCard, roles: ['admin', 'supervisor', 'cashier'] },
-  { name: 'Productos', href: '/products', icon: Package, roles: ['admin'] },
-  { name: 'Categorias', href: '/categories', icon: FolderTree, roles: ['admin'] },
-  { name: 'Inventario', href: '/inventory', icon: Warehouse, roles: ['admin', 'supervisor'] },
-  { name: 'Reportes', href: '/reports', icon: BarChart3, roles: ['admin', 'supervisor'] },
-  { name: 'Usuarios', href: '/users', icon: Users, roles: ['admin'] },
-  { name: 'Configuracion', href: '/settings', icon: Settings, roles: ['admin'] },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: [ROLES.ADMIN, ROLES.SUPERVISOR] },
+  { name: 'Ventas', href: '/sales', icon: ShoppingCart, roles: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.SELLER] },
+  { name: 'Caja', href: '/cashier', icon: CreditCard, roles: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.CASHIER] },
+  { name: 'Productos', href: '/products', icon: Package, roles: [ROLES.ADMIN] },
+  { name: 'Categorias', href: '/categories', icon: FolderTree, roles: [ROLES.ADMIN] },
+  { name: 'Inventario', href: '/inventory', icon: Warehouse, roles: [ROLES.ADMIN, ROLES.SUPERVISOR] },
+  { name: 'Reportes', href: '/reports', icon: BarChart3, roles: [ROLES.ADMIN, ROLES.SUPERVISOR] },
+  { name: 'Usuarios', href: '/users', icon: Users, roles: [ROLES.ADMIN] },
+  { name: 'Configuracion', href: '/settings', icon: Settings, roles: [ROLES.ADMIN] },
 ];
 
 export function Layout() {

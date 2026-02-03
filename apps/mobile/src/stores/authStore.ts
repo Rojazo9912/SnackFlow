@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { supabase } from '../lib/supabase';
 import { persist } from 'zustand/middleware';
 
 interface Tenant {
@@ -45,12 +46,14 @@ export const useAuthStore = create<AuthState>()(
           isAuthenticated: true,
         }),
 
-      logout: () =>
+      logout: () => {
+        supabase.auth.signOut().catch(() => undefined);
         set({
           user: null,
           accessToken: null,
           isAuthenticated: false,
-        }),
+        });
+      },
 
       updateUser: (userData) =>
         set((state) => ({
@@ -67,3 +70,5 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+

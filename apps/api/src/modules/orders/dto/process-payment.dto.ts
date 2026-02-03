@@ -1,4 +1,4 @@
-import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, Min } from 'class-validator';
+import { IsString, IsNumber, IsOptional, IsArray, ValidateNested, Min, IsObject } from 'class-validator';
 import { Type } from 'class-transformer';
 
 export class PaymentMethodDto {
@@ -25,6 +25,7 @@ export class ProcessPaymentDto {
   change?: number;
 
   @IsOptional()
-  @IsString()
-  paymentDetails?: string;
+  @IsObject()
+  paymentDetails?: Record<string, any>;
 }
+

@@ -108,16 +108,20 @@ export class CashRegisterService {
     sessionId: string,
     openingAmount: number,
   ): Promise<number> {
-    // Get cash sales during this session
-    const { data: cashOrders } = await this.supabase
-      .from('orders')
-      .select('total')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'paid')
-      .eq('payment_method', 'cash')
-      .gte('updated_at', (await this.getSessionOpenedAt(sessionId)));
+    // Get cash payments linked to this session
+    const { data: cashPayments, error: cashPaymentsError } = await this.supabase
+      .from('order_payments')
+      .select('amount, order:orders!inner(id, tenant_id, status, cash_register_session_id)')
+      .eq('order.tenant_id', tenantId)
+      .eq('order.cash_register_session_id', sessionId)
+      .eq('order.status', 'paid')
+      .eq('payment_method', 'cash');
 
-    const salesTotal = cashOrders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
+    if (cashPaymentsError) {
+      throw new Error(`Error obteniendo pagos en efectivo: ${cashPaymentsError.message}`);
+    }
+
+    const cashSales = cashPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 
     // Get cash movements
     const { data: movements } = await this.supabase
@@ -134,10 +138,10 @@ export class CashRegisterService {
       }
     });
 
-    return openingAmount + salesTotal + movementsTotal;
+    return openingAmount + cashSales + movementsTotal;
   }
 
-  private async getSessionOpenedAt(sessionId: string): Promise<string> {
+  private async getSessionOpenedAt(sessionId: string): Promise<string> {(sessionId: string): Promise<string> {
     const { data } = await this.supabase
       .from('cash_sessions')
       .select('opened_at')
@@ -209,3 +213,4 @@ export class CashRegisterService {
     return data;
   }
 }
+

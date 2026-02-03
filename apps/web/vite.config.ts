@@ -4,6 +4,12 @@ import { VitePWA } from 'vite-plugin-pwa';
 import path from 'path';
 
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@snackflow/shared': path.resolve(__dirname, '../../packages/shared/src'),
+    },
+  },
   // Base path para Capacitor
   base: './',
 
@@ -86,11 +92,6 @@ export default defineConfig({
       },
     }),
   ],
-  resolve: {
-    alias: {
-      '@': path.resolve(__dirname, './src'),
-    },
-  },
   server: {
     port: 5173,
     proxy: {

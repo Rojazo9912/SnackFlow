@@ -4,6 +4,7 @@ import { showToast } from '../utils/toast';
 import { usersApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
+import { ROLES, ROLE_LABELS } from '@snackflow/shared';
 
 interface User {
   id: string;
@@ -24,7 +25,7 @@ export function UsersPage() {
     email: '',
     password: '',
     name: '',
-    role: 'seller',
+    role: ROLES.SELLER,
     pin: '',
   });
 
@@ -96,19 +97,13 @@ export function UsersPage() {
       email: '',
       password: '',
       name: '',
-      role: 'seller',
+      role: ROLES.SELLER,
       pin: '',
     });
   };
 
   const getRoleLabel = (role: string) => {
-    const labels: Record<string, string> = {
-      admin: 'Administrador',
-      supervisor: 'Supervisor',
-      cashier: 'Cajero',
-      seller: 'Vendedor',
-    };
-    return labels[role] || role;
+    return ROLE_LABELS[role] || role;
   };
 
   if (loading) {
@@ -276,10 +271,10 @@ export function UsersPage() {
                   className="input"
                   required
                 >
-                  <option value="seller">Vendedor</option>
-                  <option value="cashier">Cajero</option>
-                  <option value="supervisor">Supervisor</option>
-                  <option value="admin">Administrador</option>
+                  <option value={ROLES.SELLER}>{ROLE_LABELS[ROLES.SELLER]}</option>
+                  <option value={ROLES.CASHIER}>{ROLE_LABELS[ROLES.CASHIER]}</option>
+                  <option value={ROLES.SUPERVISOR}>{ROLE_LABELS[ROLES.SUPERVISOR]}</option>
+                  <option value={ROLES.ADMIN}>{ROLE_LABELS[ROLES.ADMIN]}</option>
                 </select>
               </div>
 

@@ -27,7 +27,7 @@ CREATE TABLE users (
     email VARCHAR(255) NOT NULL,
     name VARCHAR(255) NOT NULL,
     role VARCHAR(50) NOT NULL CHECK (role IN ('admin', 'supervisor', 'cashier', 'seller')),
-    pin VARCHAR(10),
+    pin VARCHAR(255),
     active BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -60,6 +60,7 @@ CREATE TABLE products (
     active BOOLEAN DEFAULT TRUE,
     is_favorite BOOLEAN DEFAULT FALSE,
     is_composite BOOLEAN DEFAULT FALSE,
+    has_variants BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
@@ -77,18 +78,58 @@ CREATE TABLE product_ingredients (
     CONSTRAINT unique_product_ingredient UNIQUE (product_id, ingredient_id)
 );
 
+-- Product Attributes
+CREATE TABLE product_attributes (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    name VARCHAR(100) NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_attribute_per_tenant UNIQUE (tenant_id, name)
+);
+
+-- Attribute Values
+CREATE TABLE attribute_values (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    attribute_id UUID NOT NULL REFERENCES product_attributes(id) ON DELETE CASCADE,
+    value VARCHAR(100) NOT NULL,
+    display_order INT DEFAULT 0,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_value_per_attribute UNIQUE (attribute_id, value)
+);
+
+-- Product Variants
+CREATE TABLE product_variants (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    sku VARCHAR(100),
+    price DECIMAL(10, 2) NOT NULL CHECK (price >= 0),
+    stock INT NOT NULL DEFAULT 0 CHECK (stock >= 0),
+    min_stock INT DEFAULT 0,
+    attributes JSONB NOT NULL DEFAULT '{}',
+    active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW(),
+    CONSTRAINT unique_sku_per_tenant UNIQUE (tenant_id, sku)
+);
+
 -- Orders
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
     user_id UUID NOT NULL REFERENCES users(id),
     cashier_id UUID REFERENCES users(id),
+    cash_register_session_id UUID,
     status VARCHAR(50) NOT NULL DEFAULT 'pending'
         CHECK (status IN ('draft', 'pending', 'in_cashier', 'paid', 'cancelled')),
     subtotal DECIMAL(10, 2) NOT NULL DEFAULT 0,
     total DECIMAL(10, 2) NOT NULL DEFAULT 0,
     payment_method VARCHAR(50) CHECK (payment_method IN ('cash', 'card', 'transfer', 'mixed')),
     payment_details JSONB,
+    paid_at TIMESTAMPTZ,
     notes TEXT,
     cancellation_reason TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW(),
@@ -100,11 +141,23 @@ CREATE TABLE order_items (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
     product_id UUID NOT NULL REFERENCES products(id),
+    variant_id UUID REFERENCES product_variants(id),
     quantity INTEGER NOT NULL CHECK (quantity > 0),
     unit_price DECIMAL(10, 2) NOT NULL,
     subtotal DECIMAL(10, 2) NOT NULL,
     notes TEXT,
     created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Order Payments
+CREATE TABLE order_payments (
+    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    order_id UUID NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    tenant_id UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    payment_method VARCHAR(50) NOT NULL CHECK (payment_method IN ('cash', 'card', 'transfer')),
+    amount DECIMAL(10, 2) NOT NULL CHECK (amount >= 0),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- Inventory Movements
@@ -136,8 +189,13 @@ CREATE TABLE cash_sessions (
     closed_at TIMESTAMPTZ
 );
 
--- Cash Movements
-CREATE TABLE cash_movements (
+
+-- Link orders to cash sessions (after cash_sessions table exists)
+ALTER TABLE orders
+ADD CONSTRAINT orders_cash_register_session_fkey
+FOREIGN KEY (cash_register_session_id)
+REFERENCES cash_sessions(id);
+$(MATCH) (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     session_id UUID NOT NULL REFERENCES cash_sessions(id) ON DELETE CASCADE,
     type VARCHAR(50) NOT NULL CHECK (type IN ('deposit', 'withdrawal')),
@@ -173,7 +231,13 @@ CREATE INDEX idx_orders_tenant ON orders(tenant_id);
 CREATE INDEX idx_orders_status ON orders(tenant_id, status);
 CREATE INDEX idx_orders_user ON orders(user_id);
 CREATE INDEX idx_orders_created ON orders(created_at DESC);
+CREATE INDEX idx_orders_paid_at ON orders(paid_at);
+CREATE INDEX idx_orders_cash_session ON orders(cash_register_session_id);
 CREATE INDEX idx_order_items_order ON order_items(order_id);
+CREATE INDEX idx_order_items_variant ON order_items(variant_id);
+CREATE INDEX idx_order_payments_order_id ON order_payments(order_id);
+CREATE INDEX idx_order_payments_tenant_id ON order_payments(tenant_id);
+CREATE INDEX idx_order_payments_created_at ON order_payments(created_at);
 CREATE INDEX idx_inventory_movements_product ON inventory_movements(product_id);
 CREATE INDEX idx_inventory_movements_tenant ON inventory_movements(tenant_id);
 CREATE INDEX idx_cash_sessions_tenant ON cash_sessions(tenant_id);
@@ -181,6 +245,14 @@ CREATE INDEX idx_audit_logs_tenant ON audit_logs(tenant_id);
 CREATE INDEX idx_product_ingredients_product ON product_ingredients(product_id);
 CREATE INDEX idx_product_ingredients_ingredient ON product_ingredients(ingredient_id);
 CREATE INDEX idx_product_ingredients_tenant ON product_ingredients(tenant_id);
+CREATE INDEX idx_product_attributes_tenant ON product_attributes(tenant_id);
+CREATE INDEX idx_product_attributes_display_order ON product_attributes(display_order);
+CREATE INDEX idx_attribute_values_attribute ON attribute_values(attribute_id);
+CREATE INDEX idx_attribute_values_display_order ON attribute_values(display_order);
+CREATE INDEX idx_product_variants_product ON product_variants(product_id);
+CREATE INDEX idx_product_variants_tenant ON product_variants(tenant_id);
+CREATE INDEX idx_product_variants_active ON product_variants(active);
+CREATE INDEX idx_product_variants_attributes ON product_variants USING GIN (attributes);
 
 -- =============================================
 -- FUNCTIONS
@@ -216,8 +288,13 @@ BEGIN
     FROM products
     WHERE id = p_product_id AND tenant_id = p_tenant_id;
 
+    -- Validate stock
+    IF v_previous_stock < p_quantity THEN
+        RAISE EXCEPTION 'Insufficient stock for product % (requested %, available %)', p_product_id, p_quantity, v_previous_stock;
+    END IF;
+
     -- Calculate new stock
-    v_new_stock := GREATEST(v_previous_stock - p_quantity, 0);
+    v_new_stock := v_previous_stock - p_quantity;
 
     -- Update product stock
     UPDATE products
@@ -396,6 +473,22 @@ CREATE TRIGGER update_product_ingredients_updated_at
     BEFORE UPDATE ON product_ingredients
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
+CREATE TRIGGER update_product_attributes_updated_at
+    BEFORE UPDATE ON product_attributes
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_attribute_values_updated_at
+    BEFORE UPDATE ON attribute_values
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_product_variants_updated_at
+    BEFORE UPDATE ON product_variants
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+CREATE TRIGGER update_order_payments_updated_at
+    BEFORE UPDATE ON order_payments
+    FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
 -- =============================================
 -- ROW LEVEL SECURITY (RLS)
 -- =============================================
@@ -407,11 +500,15 @@ ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
 ALTER TABLE products ENABLE ROW LEVEL SECURITY;
 ALTER TABLE orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE order_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE order_payments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cash_sessions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cash_movements ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE product_ingredients ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_attributes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE attribute_values ENABLE ROW LEVEL SECURITY;
+ALTER TABLE product_variants ENABLE ROW LEVEL SECURITY;
 
 -- Tenants policies
 CREATE POLICY "Users can view their own tenant"
@@ -458,6 +555,77 @@ CREATE POLICY "Admins can manage product ingredients in their tenant"
     ON product_ingredients FOR ALL
     USING (tenant_id = get_current_tenant_id());
 
+-- Product Attributes policies
+CREATE POLICY "Users can view attributes from their tenant"
+    ON product_attributes FOR SELECT
+    USING (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can insert attributes for their tenant"
+    ON product_attributes FOR INSERT
+    WITH CHECK (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can update attributes from their tenant"
+    ON product_attributes FOR UPDATE
+    USING (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can delete attributes from their tenant"
+    ON product_attributes FOR DELETE
+    USING (tenant_id = get_current_tenant_id());
+
+-- Attribute Values policies
+CREATE POLICY "Users can view attribute values from their tenant"
+    ON attribute_values FOR SELECT
+    USING (
+        attribute_id IN (
+            SELECT id FROM product_attributes
+            WHERE tenant_id = get_current_tenant_id()
+        )
+    );
+
+CREATE POLICY "Users can insert attribute values for their tenant"
+    ON attribute_values FOR INSERT
+    WITH CHECK (
+        attribute_id IN (
+            SELECT id FROM product_attributes
+            WHERE tenant_id = get_current_tenant_id()
+        )
+    );
+
+CREATE POLICY "Users can update attribute values from their tenant"
+    ON attribute_values FOR UPDATE
+    USING (
+        attribute_id IN (
+            SELECT id FROM product_attributes
+            WHERE tenant_id = get_current_tenant_id()
+        )
+    );
+
+CREATE POLICY "Users can delete attribute values from their tenant"
+    ON attribute_values FOR DELETE
+    USING (
+        attribute_id IN (
+            SELECT id FROM product_attributes
+            WHERE tenant_id = get_current_tenant_id()
+        )
+    );
+
+-- Product Variants policies
+CREATE POLICY "Users can view variants from their tenant"
+    ON product_variants FOR SELECT
+    USING (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can insert variants for their tenant"
+    ON product_variants FOR INSERT
+    WITH CHECK (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can update variants from their tenant"
+    ON product_variants FOR UPDATE
+    USING (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can delete variants from their tenant"
+    ON product_variants FOR DELETE
+    USING (tenant_id = get_current_tenant_id());
+
 -- Orders policies
 CREATE POLICY "Users can view orders in their tenant"
     ON orders FOR SELECT
@@ -492,6 +660,15 @@ CREATE POLICY "Users can manage order items for their tenant's orders"
         )
     );
 
+-- Order Payments policies
+CREATE POLICY "Users can view order payments from their tenant"
+    ON order_payments FOR SELECT
+    USING (tenant_id = get_current_tenant_id());
+
+CREATE POLICY "Users can insert order payments for their tenant"
+    ON order_payments FOR INSERT
+    WITH CHECK (tenant_id = get_current_tenant_id());
+
 -- Inventory movements policies
 CREATE POLICY "Users can view inventory movements in their tenant"
     ON inventory_movements FOR SELECT
@@ -510,7 +687,8 @@ CREATE POLICY "Cashiers can manage cash sessions in their tenant"
     ON cash_sessions FOR ALL
     USING (tenant_id = get_current_tenant_id());
 
--- Cash movements policies
+
+-- Cash Movements policies
 CREATE POLICY "Users can view cash movements for their tenant's sessions"
     ON cash_movements FOR SELECT
     USING (
@@ -586,3 +764,6 @@ INSERT INTO products (tenant_id, category_id, name, code, price, stock, min_stoc
  (SELECT id FROM categories WHERE name = 'Bebidas' LIMIT 1),
  'Coca Cola 600ml', 'COC-001', 22.00, 24, 6, false);
 */
+
+
+

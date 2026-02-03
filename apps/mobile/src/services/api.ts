@@ -1,4 +1,5 @@
 import { useAuthStore } from '../stores/authStore';
+import { addOrder, getAllOrders, updateOrder, removeOrders } from '../lib/offlineQueue';
 
 const API_URL = import.meta.env.VITE_API_URL || '/api';
 
@@ -41,13 +42,17 @@ async function request<T>(
     throw new ApiError(401, 'Sesion expirada');
   }
 
-  const data = await response.json();
+  const contentType = response.headers.get('content-type') || '';
+  const data = contentType.includes('application/json')
+    ? await response.json()
+    : await response.text();
 
   if (!response.ok) {
-    throw new ApiError(response.status, data.message || 'Error en la solicitud');
+    const message = typeof data === 'string' ? data : data.message;
+    throw new ApiError(response.status, message || 'Error en la solicitud');
   }
 
-  return data;
+  return data as T;
 }
 
 export const api = {
@@ -134,28 +139,27 @@ export const categoriesApi = {
 };
 
 // Offline Queue Logic
-const OFFLINE_QUEUE_KEY = 'sf_offline_queue';
-
 export const offlineService = {
-  getQueue: () => JSON.parse(localStorage.getItem(OFFLINE_QUEUE_KEY) || '[]'),
+  getQueue: () => getAllOrders(),
 
-  addToQueue: (orderData: any) => {
-    const queue = offlineService.getQueue();
+  addToQueue: async (orderData: any) => {
     const offlineOrder = {
       ...orderData,
       tempId: `OFFLINE-${Date.now()}`,
       timestamp: new Date().toISOString(),
+      status: 'pending',
     };
-    queue.push(offlineOrder);
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue));
+
+    await addOrder(offlineOrder);
+
     return {
       id: offlineOrder.tempId,
       ...orderData,
       created_at: offlineOrder.timestamp,
       status: 'pending',
-      total: orderData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0), // Simple total calculation
+      total: orderData.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
       is_offline: true,
-      user: { name: 'Offline User' }, // Placeholder
+      user: { name: 'Offline User' },
       order_items: orderData.items.map((item: any, index: number) => ({
         id: `OFFLINE-ITEM-${Date.now()}-${index}`,
         ...item,
@@ -164,27 +168,44 @@ export const offlineService = {
     };
   },
 
+  updateOfflineOrder: async (id: string, updates: any) => {
+    return updateOrder(id, updates);
+  },
+
   sync: async () => {
     if (!navigator.onLine) return;
 
-    const queue = offlineService.getQueue();
+    const queue = await getAllOrders();
     if (queue.length === 0) return;
 
     console.log(`Syncing ${queue.length} offline orders...`);
-    const remainingQueue = [];
+    const toRemove: string[] = [];
     let syncedCount = 0;
 
     for (const order of queue) {
       try {
-        await api.post('/orders', order);
+        const createData = {
+          items: order.items,
+          notes: order.notes
+        };
+
+        const createdOrder = await api.post<any>('/orders', createData);
+
+        if (order.status === 'completed' && order.paymentData) {
+          await api.post<any>(`/orders/${createdOrder.id}/pay`, order.paymentData);
+        }
+
         syncedCount++;
+        toRemove.push(order.tempId);
       } catch (error) {
         console.error('Error syncing order:', order, error);
-        remainingQueue.push(order); // Keep in queue if fails
       }
     }
 
-    localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remainingQueue));
+    if (toRemove.length > 0) {
+      await removeOrders(toRemove);
+    }
+
     if (syncedCount > 0) {
       window.dispatchEvent(new CustomEvent('offline-sync-complete', { detail: { count: syncedCount } }));
     }
@@ -201,9 +222,62 @@ export const ordersApi = {
     const query = searchParams.toString();
     return api.get<any[]>(`/orders${query ? `?${query}` : ''}`);
   },
-  getPending: () => api.get<any[]>('/orders/pending'),
+  getPending: async () => {
+    let onlineOrders: any[] = [];
+    try {
+      if (navigator.onLine) {
+        onlineOrders = await api.get<any[]>('/orders/pending');
+      }
+    } catch (e) {
+      console.warn('Could not fetch online orders', e);
+    }
+
+    // Get offline orders that are pending
+    const offlineQueue = await offlineService.getQueue();
+    const offlinePending = offlineQueue
+      .filter((o: any) => o.status === 'pending')
+      .map((o: any) => ({
+        id: o.tempId,
+        ...o,
+        created_at: o.timestamp,
+        status: 'pending',
+        total: o.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
+        is_offline: true,
+        user: { name: 'Offline User' },
+        order_items: o.items.map((item: any, index: number) => ({
+          id: `OFFLINE-ITEM-${Date.now()}-${index}`,
+          ...item,
+          product: { name: item.name || 'Producto Offline' }
+        }))
+      }));
+
+    return [...offlinePending, ...onlineOrders];
+  },
   getMyOrders: () => api.get<any[]>('/orders/my-orders'),
-  getOne: (id: string) => api.get<any>(`/orders/${id}`),
+  getOne: async (id: string) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      const queue = await offlineService.getQueue();
+      const order = queue.find((o: any) => o.tempId === id);
+      if (order) {
+        return {
+          id: order.tempId,
+          ...order,
+          created_at: order.timestamp,
+          status: order.status || 'pending',
+          total: order.items.reduce((acc: number, item: any) => acc + (item.price * item.quantity), 0),
+          is_offline: true,
+          user: { name: 'Offline User' },
+          order_items: order.items.map((item: any, index: number) => ({
+            id: `OFFLINE-ITEM-${Date.now()}-${index}`,
+            ...item,
+            product: { name: item.name || 'Producto Offline' }
+          }))
+        };
+      }
+      throw new Error('Order not found in offline queue');
+    }
+    return api.get<any>(`/orders/${id}`);
+  },
   create: async (data: { items: { productId: string; quantity: number; notes?: string; price?: number; name?: string }[]; notes?: string }) => {
     if (!navigator.onLine) {
       console.log('Offline mode: Queuing order');
@@ -219,19 +293,43 @@ export const ordersApi = {
       throw error;
     }
   },
-  updateStatus: (id: string, status: string, reason?: string) =>
-    api.patch<any>(`/orders/${id}/status`, { status, reason }),
-  processPayment: (
+  updateStatus: async (id: string, status: string, reason?: string) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      await offlineService.updateOfflineOrder(id, { status });
+      return { success: true, offline: true };
+    }
+    return api.patch<any>(`/orders/${id}/status`, { status, reason });
+  },
+  processPayment: async (
     id: string,
     payments: Array<{ method: string; amount: number }>,
     amountReceived?: number,
     change?: number
-  ) =>
-    api.post<any>(`/orders/${id}/pay`, {
-      payments,
-      amountReceived,
-      change,
-    }),
+  ) => {
+    if (id.toString().startsWith('OFFLINE-')) {
+      // Handle offline payment
+      await offlineService.updateOfflineOrder(id, {
+        status: 'completed',
+        paymentData: { payments, amountReceived, change },
+        payments,
+        change
+      });
+      return { success: true, offline: true };
+    }
+
+    try {
+      return await api.post<any>(`/orders/${id}/pay`, {
+        payments,
+        amountReceived,
+        change,
+      });
+    } catch (error) {
+      if (!navigator.onLine) {
+        throw new Error('No se puede procesar pago de pedido online Sin conexion');
+      }
+      throw error;
+    }
+  },
   cancel: (id: string, reason: string) =>
     api.post<any>(`/orders/${id}/cancel`, { reason }),
 };
@@ -281,10 +379,9 @@ export const reportsApi = {
     if (params?.date) searchParams.set('date', params.date);
     if (params?.format) searchParams.set('format', params.format);
 
+    const token = useAuthStore.getState().accessToken;
     const response = await fetch(`${API_URL}/reports/daily-sales/export?${searchParams.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('sf_token')}`,
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
     if (!response.ok) throw new Error('Error exportando reporte');
@@ -303,10 +400,9 @@ export const reportsApi = {
     const searchParams = new URLSearchParams();
     if (params?.days) searchParams.set('days', params.days.toString());
 
+    const token = useAuthStore.getState().accessToken;
     const response = await fetch(`${API_URL}/reports/top-products/export?${searchParams.toString()}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('sf_token')}`,
-      },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
 
     if (!response.ok) throw new Error('Error exportando reporte');
@@ -367,3 +463,10 @@ export const filesApi = {
     return response.json() as Promise<{ url: string }>;
   },
 };
+
+
+
+
+
+
+

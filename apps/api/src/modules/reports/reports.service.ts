@@ -21,11 +21,11 @@ export class ReportsService {
 
     const { data: orders, error } = await this.supabase
       .from('orders')
-      .select('id, total, payment_method, created_at')
+      .select('id, total, payment_method, paid_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
-      .gte('created_at', startOfDay)
-      .lte('created_at', endOfDay);
+      .gte('paid_at', startOfDay)
+      .lte('paid_at', endOfDay);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
@@ -99,9 +99,17 @@ export class ReportsService {
 
     orders?.forEach((o) => {
       // Handle mixed payments if payment_details exists
-      if (o.payment_method === 'mixed' && o.payment_details && typeof o.payment_details === 'object') {
-        const details = o.payment_details as any;
-        if (details.payments && Array.isArray(details.payments)) {
+      if (o.payment_method === 'mixed' && o.payment_details) {
+        let details: any = o.payment_details as any;
+        if (typeof details === 'string') {
+          try {
+            details = JSON.parse(details);
+          } catch {
+            details = null;
+          }
+        }
+
+        if (details && details.payments && Array.isArray(details.payments)) {
           details.payments.forEach((p: any) => {
             if (byPaymentMethod[p.method] !== undefined) {
               byPaymentMethod[p.method] += p.amount || 0;
@@ -152,11 +160,11 @@ export class ReportsService {
 
     const { data: orders, error } = await this.supabase
       .from('orders')
-      .select('total, created_at')
+      .select('total, paid_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
-      .gte('created_at', startOfDay)
-      .lte('created_at', endOfDay);
+      .gte('paid_at', startOfDay)
+      .lte('paid_at', endOfDay);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
@@ -169,7 +177,7 @@ export class ReportsService {
     }
 
     orders?.forEach((o) => {
-      const hour = new Date(o.created_at).getHours();
+      const hour = new Date(o.paid_at).getHours();
       byHour[hour].count++;
       byHour[hour].total += o.total || 0;
     });
@@ -183,6 +191,7 @@ export class ReportsService {
   async getTopProducts(tenantId: string, days = 7, limit = 10) {
     const fromDate = new Date();
     fromDate.setDate(fromDate.getDate() - days);
+    const fromDateStr = fromDate.toISOString();
 
     const { data, error } = await this.supabase
       .from('order_items')
@@ -190,10 +199,13 @@ export class ReportsService {
         `
         quantity,
         subtotal,
+        order:orders!inner(id, tenant_id, status, paid_at),
         product:products!inner(id, name, code, tenant_id)
       `,
       )
-      .eq('product.tenant_id', tenantId);
+      .eq('order.tenant_id', tenantId)
+      .eq('order.status', 'paid')
+      .gte('order.paid_at', fromDateStr);
 
     if (error) {
       throw new Error(`Error obteniendo productos: ${error.message}`);
@@ -237,7 +249,6 @@ export class ReportsService {
       products: sorted,
     };
   }
-
   async getSalesComparison(tenantId: string) {
     const today = new Date();
     const yesterday = new Date(today);
@@ -441,13 +452,18 @@ export class ReportsService {
   }
 
   private async getPendingOrdersCount(tenantId: string): Promise<number> {
-    const { data, error } = await this.supabase
+    const { count, error } = await this.supabase
       .from('orders')
-      .select('id', { count: 'exact', head: true })
+      .select('*', { count: 'exact', head: true })
       .eq('tenant_id', tenantId)
       .eq('status', 'pending');
 
     if (error) return 0;
-    return data?.length || 0;
+    return count || 0;
   }
 }
+
+
+
+
+

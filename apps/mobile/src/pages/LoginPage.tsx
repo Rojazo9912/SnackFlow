@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { useAuthStore } from '../stores/authStore';
 import { authApi, tenantsApi } from '../services/api';
+import { supabase } from '../lib/supabase';
 
 export function LoginPage() {
   const [email, setEmail] = useState('');
@@ -34,6 +35,15 @@ export function LoginPage() {
 
     try {
       const response = await authApi.login(email, password);
+      const { error: supabaseError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (supabaseError) {
+        throw new Error('No se pudo iniciar sesion en tiempo real');
+      }
+
       login(response.user, response.accessToken);
       toast.success('Bienvenido a SnackFlow');
       navigate('/dashboard');
@@ -120,3 +130,5 @@ export function LoginPage() {
     </div>
   );
 }
+
+

@@ -1,4 +1,5 @@
 import { Injectable, Inject, UnauthorizedException } from '@nestjs/common';
+import * as bcrypt from 'bcryptjs';
 import { JwtService } from '@nestjs/jwt';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { SUPABASE_CLIENT } from '../../database/database.module';
@@ -68,8 +69,24 @@ export class AuthService {
       .eq('id', userId)
       .single();
 
-    if (error || !user || user.pin !== pin) {
+    if (error || !user || !user.pin) {
       throw new UnauthorizedException('PIN invalido');
+    }
+
+    const isHashed = user.pin.startsWith('$2');
+    const isValid = isHashed ? await bcrypt.compare(pin, user.pin) : user.pin === pin;
+
+    if (!isValid) {
+      throw new UnauthorizedException('PIN invalido');
+    }
+
+    // Upgrade legacy plain PINs to hashed
+    if (!isHashed) {
+      const hashed = await bcrypt.hash(pin, 10);
+      await this.supabase
+        .from('users')
+        .update({ pin: hashed })
+        .eq('id', userId);
     }
 
     const payload = {
@@ -95,3 +112,5 @@ export class AuthService {
     return { message: 'Sesion cerrada exitosamente' };
   }
 }
+
+
