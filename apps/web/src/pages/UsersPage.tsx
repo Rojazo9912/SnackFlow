@@ -14,6 +14,14 @@ interface User {
   active: boolean;
 }
 
+interface FormData {
+  email: string;
+  password: string;
+  name: string;
+  role: UserRole;
+  pin: string;
+}
+
 export function UsersPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +29,7 @@ export function UsersPage() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
 
   // Form state
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     email: '',
     password: '',
     name: '',

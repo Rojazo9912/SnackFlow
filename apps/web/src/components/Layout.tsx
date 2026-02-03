@@ -16,9 +16,9 @@ import {
   History,
 } from 'lucide-react';
 import { useAuthStore } from '../stores/authStore';
-import { ROLES } from '@snackflow/shared';
+import { ROLES, type UserRole } from '@snackflow/shared';
 
-const navigation = [
+const navigation: { name: string; href: string; icon: typeof LayoutDashboard; roles: UserRole[] }[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: [ROLES.ADMIN, ROLES.SUPERVISOR] },
   { name: 'Ventas', href: '/sales', icon: ShoppingCart, roles: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.SELLER] },
   { name: 'Historial', href: '/history', icon: History, roles: [ROLES.ADMIN, ROLES.SUPERVISOR, ROLES.CASHIER] },
