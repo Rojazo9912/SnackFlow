@@ -1,6 +1,8 @@
 import { useAuthStore } from '../stores/authStore';
 import { Moon, Sun } from 'lucide-react';
 import { useTheme } from '../hooks/useTheme';
+import { useEffect } from 'react';
+import { showToast } from '../utils/toast';
 
 interface HeaderProps {
     title: string;
@@ -13,6 +15,16 @@ export function Header({ title, subtitle, actions }: HeaderProps) {
     const { theme, toggleTheme } = useTheme();
     const tenantLogo = user?.tenant?.settings?.logo;
     const tenantName = user?.tenant?.name;
+
+    useEffect(() => {
+        const handleLowStock = (e: CustomEvent) => {
+            const product = e.detail;
+            showToast.warning(`⚠️ Stock bajo: ${product.name} (${product.stock} disponibles)`);
+        };
+
+        window.addEventListener('low-stock-alert' as any, handleLowStock);
+        return () => window.removeEventListener('low-stock-alert' as any, handleLowStock);
+    }, []);
 
     return (
         <div className="mb-6">
