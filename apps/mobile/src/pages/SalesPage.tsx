@@ -1,12 +1,19 @@
 import { useEffect, useState, useRef } from 'react';
-import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List } from 'lucide-react';
+import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List, AlertTriangle, Banknote } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { useCartStore } from '../stores/cartStore';
-import { productsApi, categoriesApi, ordersApi } from '../services/api';
+import { productsApi, categoriesApi, ordersApi, tenantsApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
 import { playSound } from '../utils/notifications';
+
+import { useRealtimeNotifications } from '../hooks/useRealtimeNotifications';
+import { PaymentModal } from '../components/cashier/PaymentModal';
+import { TicketPreviewModal } from '../components/TicketPreviewModal';
+import { PrintTicket } from '../components/PrintTicket';
+import { useAuthStore } from '../stores/authStore';
+import { ORDER_STATUS } from '@snackflow/shared';
 
 interface Product {
   id: string;
@@ -55,18 +62,31 @@ export function SalesPage() {
 
   const [customerName, setCustomerName] = useState('');
 
+  // Cobrar (direct charge) flow state
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showTicketPreview, setShowTicketPreview] = useState(false);
+  const [processingPayment, setProcessingPayment] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [orderToPrint, setOrderToPrint] = useState<any>(null);
+  const { user } = useAuthStore();
+  const printRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     loadData();
   }, []);
 
   const loadData = async () => {
     try {
-      const [productsData, categoriesData] = await Promise.all([
+      const [productsData, categoriesData, tenantData] = await Promise.all([
         productsApi.getAll({ calculateCompositeStock: true }),
         categoriesApi.getAll(),
+        tenantsApi.getCurrent(),
       ]);
       setProducts(productsData);
       setCategories(categoriesData);
+      if (tenantData && user) {
+        user.tenant = tenantData;
+      }
     } catch (error) {
       showToast.error('Error cargando datos');
     } finally {
@@ -139,6 +159,25 @@ export function SalesPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [search, filteredProducts, items, addItem]);
 
+  // Realtime updates for products
+  useRealtimeNotifications({
+    onProductUpdate: (newProduct: Product) => {
+      setProducts(prev => prev.map(p => p.id === newProduct.id ? { ...p, ...newProduct } : p));
+    }
+  });
+
+  // Listen for low stock alerts
+  useEffect(() => {
+    const handleLowStock = (e: CustomEvent) => {
+      const product = e.detail;
+      showToast.warning(`⚠️ ¡Alerta! Stock bajo para: ${product.name} (${product.stock} restantes)`);
+      playSound('error');
+    };
+
+    window.addEventListener('low-stock-alert', handleLowStock as any);
+    return () => window.removeEventListener('low-stock-alert', handleLowStock as any);
+  }, []);
+
   // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
     onNewSale: () => {
@@ -174,6 +213,103 @@ export function SalesPage() {
       showToast.error(error.message || 'Error enviando pedido');
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleCobrar = async () => {
+    if (items.length === 0) {
+      showToast.warning('Agrega productos al pedido');
+      return;
+    }
+
+    setProcessingPayment(true);
+    try {
+      const order = await ordersApi.create({
+        items: items.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          notes: item.notes,
+        })),
+        notes: customerName ? `[Cliente: ${customerName}] ${notes || ''}` : notes,
+      });
+
+      await ordersApi.updateStatus(order.id, ORDER_STATUS.IN_CASHIER);
+      setCurrentOrderId(order.id);
+      setShowPaymentModal(true);
+    } catch (error: any) {
+      showToast.error(error.message || 'Error creando pedido');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handleConfirmPayment = async (
+    payments: Array<{ method: string; amount: number }>,
+    receivedAmount?: number,
+    changeAmount?: number
+  ) => {
+    if (!currentOrderId) return;
+
+    setProcessingPayment(true);
+    try {
+      await ordersApi.processPayment(
+        currentOrderId,
+        payments,
+        receivedAmount,
+        changeAmount
+      );
+
+      const ticketData = {
+        id: currentOrderId,
+        total: getTotal(),
+        notes: customerName ? `[Cliente: ${customerName}] ${notes || ''}` : notes,
+        created_at: new Date().toISOString(),
+        user: { name: user?.name || 'Vendedor' },
+        order_items: items.map((item, index) => ({
+          id: `item-${index}`,
+          quantity: item.quantity,
+          unit_price: item.price,
+          product: { name: item.name },
+          notes: item.notes,
+        })),
+        payment_method: payments.length === 1 ? payments[0].method : 'mixed',
+        payment_details: {
+          payments,
+          amountReceived: receivedAmount,
+          change: changeAmount,
+        },
+      };
+
+      setOrderToPrint(ticketData);
+      localStorage.setItem('lastPrintedTicket', JSON.stringify(ticketData));
+
+      showToast.success('Pago procesado correctamente');
+      playSound('success');
+
+      setShowPaymentModal(false);
+      clearCart();
+      setCustomerName('');
+      setCurrentOrderId(null);
+      setShowTicketPreview(true);
+
+      loadData();
+    } catch (error: any) {
+      showToast.error(error.message || 'Error procesando pago');
+      playSound('error');
+    } finally {
+      setProcessingPayment(false);
+    }
+  };
+
+  const handlePaymentCancel = async () => {
+    setShowPaymentModal(false);
+    if (currentOrderId) {
+      try {
+        await ordersApi.cancel(currentOrderId, 'Pago cancelado por el operador');
+      } catch (error) {
+        console.warn('No se pudo cancelar la orden:', error);
+      }
+      setCurrentOrderId(null);
     }
   };
 
@@ -287,9 +423,21 @@ export function SalesPage() {
                       });
                     }}
                     disabled={getAvailableStock(product) <= 0}
-                    className={`group relative bg-white p-4 rounded-2xl shadow-sm border border-transparent hover:border-primary-500 hover:shadow-md transition-all duration-200 text-left ${getAvailableStock(product) <= 0 ? 'opacity-50 cursor-not-allowed grayscale' : ''
-                      }`}
+                    className={`group relative bg-white p-4 rounded-2xl shadow-sm border transaction-all duration-200 text-left
+                      ${getAvailableStock(product) <= 0
+                        ? 'border-gray-200 opacity-50 cursor-not-allowed grayscale'
+                        : getAvailableStock(product) <= 5
+                          ? 'border-red-500 shadow-red-100 ring-1 ring-red-500 hover:shadow-red-200' // Red border for low stock
+                          : 'border-transparent hover:border-primary-500 hover:shadow-md'
+                      }
+                    `}
                   >
+                    {/* Low Stock Warning Badge */}
+                    {getAvailableStock(product) > 0 && getAvailableStock(product) <= 5 && (
+                      <div className="absolute -top-2 -right-2 bg-red-500 text-white p-1 rounded-full shadow-md z-10 animate-bounce">
+                        <AlertTriangle className="w-4 h-4" />
+                      </div>
+                    )}
                     <div className="flex flex-col mb-2 flex-1">
                       {product.image ? (
                         <div className="w-full h-32 mb-2 rounded-lg overflow-hidden relative bg-gray-50">
@@ -409,90 +557,131 @@ export function SalesPage() {
             />
           )}
         </div>
-      </div>
 
-      {/* Cart section */}
-      <div className="lg:w-80 flex flex-col bg-white rounded-xl shadow-sm">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold text-lg">
-            Pedido ({getItemCount()} items)
-          </h2>
-        </div>
-
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {items.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">
-              Agrega productos al pedido
-            </p>
-          ) : (
-            items.map((item) => (
-              <div key={item.productId} className="flex gap-3 py-2 border-b">
-                <div className="flex-1">
-                  <p className="font-medium text-sm">{item.name}</p>
-                  <p className="text-primary-600 text-sm">
-                    ${(item.price * item.quantity).toFixed(2)}
-                  </p>
-                </div>
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={() =>
-                      updateQuantity(item.productId, item.quantity - 1)
-                    }
-                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
-                  >
-                    <Minus className="w-5 h-5" />
-                  </button>
-                  <span className="w-10 text-center font-bold text-lg">{item.quantity}</span>
-                  <button
-                    onClick={() =>
-                      updateQuantity(item.productId, item.quantity + 1)
-                    }
-                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
-                  >
-                    <Plus className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => removeItem(item.productId)}
-                    className="w-10 h-10 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50 active:scale-95 transition-transform ml-1"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-            ))
-          )}
-        </div>
-
-        <div className="p-4 border-t space-y-3">
-          <input
-            type="text"
-            placeholder="Nombre del Cliente (Opcional)"
-            value={customerName}
-            onChange={(e) => setCustomerName(e.target.value)}
-            className="input text-sm"
-          />
-          <textarea
-            placeholder="Notas del pedido (opcional)"
-            value={notes}
-            onChange={(e) => setOrderNotes(e.target.value)}
-            className="input text-sm resize-none"
-            rows={2}
-          />
-
-          <div className="flex justify-between items-center text-lg font-bold">
-            <span>Total:</span>
-            <span className="text-primary-600">${getTotal().toFixed(2)}</span>
+        {/* Cart section */}
+        <div className="lg:w-72 flex-shrink-0 flex flex-col bg-white rounded-xl shadow-sm">
+          <div className="p-4 border-b">
+            <h2 className="font-semibold text-lg">
+              Pedido ({getItemCount()} items)
+            </h2>
           </div>
 
-          <button
-            onClick={handleSendOrder}
-            disabled={items.length === 0 || submitting}
-            className="btn-primary w-full py-3 flex items-center justify-center gap-2"
-          >
-            <Send className="w-5 h-5" />
-            {submitting ? 'Enviando...' : 'Enviar a Caja'}
-          </button>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {items.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">
+                Agrega productos al pedido
+              </p>
+            ) : (
+              items.map((item) => (
+                <div key={item.productId} className="flex gap-3 py-2 border-b">
+                  <div className="flex-1">
+                    <p className="font-medium text-sm">{item.name}</p>
+                    <p className="text-primary-600 text-sm">
+                      ${(item.price * item.quantity).toFixed(2)}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() =>
+                        updateQuantity(item.productId, item.quantity - 1)
+                      }
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
+                    >
+                      <Minus className="w-5 h-5" />
+                    </button>
+                    <span className="w-10 text-center font-bold text-lg">{item.quantity}</span>
+                    <button
+                      onClick={() =>
+                        updateQuantity(item.productId, item.quantity + 1)
+                      }
+                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 active:scale-95 transition-transform"
+                    >
+                      <Plus className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={() => removeItem(item.productId)}
+                      className="w-10 h-10 flex items-center justify-center rounded-xl text-red-500 hover:bg-red-50 active:scale-95 transition-transform ml-1"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="p-4 border-t space-y-3">
+            <input
+              type="text"
+              placeholder="Nombre del Cliente (Opcional)"
+              value={customerName}
+              onChange={(e) => setCustomerName(e.target.value)}
+              className="input text-sm"
+            />
+            <textarea
+              placeholder="Notas del pedido (opcional)"
+              value={notes}
+              onChange={(e) => setOrderNotes(e.target.value)}
+              className="input text-sm resize-none"
+              rows={2}
+            />
+
+            <div className="flex justify-between items-center text-lg font-bold">
+              <span>Total:</span>
+              <span className="text-primary-600">${getTotal().toFixed(2)}</span>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={handleCobrar}
+                disabled={items.length === 0 || submitting || processingPayment}
+                className="w-full py-3 flex items-center justify-center gap-2 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                <Banknote className="w-5 h-5" />
+                {processingPayment ? 'Procesando...' : 'Cobrar'}
+              </button>
+              <button
+                onClick={handleSendOrder}
+                disabled={items.length === 0 || submitting || processingPayment}
+                className="w-full py-2.5 flex items-center justify-center gap-2 rounded-xl font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors text-sm"
+              >
+                <Send className="w-4 h-4" />
+                {submitting ? 'Enviando...' : 'Enviar a Caja'}
+              </button>
+            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Payment Modal */}
+      <PaymentModal
+        isOpen={showPaymentModal}
+        onClose={handlePaymentCancel}
+        total={getTotal()}
+        onConfirm={handleConfirmPayment}
+        processing={processingPayment}
+      />
+
+      {/* Ticket Preview */}
+      <TicketPreviewModal
+        isOpen={showTicketPreview}
+        onClose={() => setShowTicketPreview(false)}
+        order={orderToPrint}
+        tenant={user?.tenant}
+        onConfirm={() => {
+          setShowTicketPreview(false);
+          setTimeout(() => window.print(), 300);
+        }}
+      />
+
+      {/* Hidden print component */}
+      <div className="hidden print:block">
+        <PrintTicket
+          ref={printRef}
+          type="ticket"
+          data={orderToPrint}
+          tenant={user?.tenant}
+        />
       </div>
     </div>
   );

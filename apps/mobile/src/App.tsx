@@ -12,6 +12,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ProductsPage } from './pages/ProductsPage';
 import { CategoriesPage } from './pages/CategoriesPage';
 import { SalesPage } from './pages/SalesPage';
+import { SalesHistoryPage } from './pages/SalesHistoryPage';
 import { CashierPage } from './pages/CashierPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -71,6 +72,7 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="sales" element={<SalesPage />} />
+          <Route path="history" element={<SalesHistoryPage />} />
           <Route path="cashier" element={<CashierPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="categories" element={<CategoriesPage />} />

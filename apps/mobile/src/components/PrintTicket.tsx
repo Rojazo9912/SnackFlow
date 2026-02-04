@@ -1,4 +1,5 @@
 import { forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 
 interface PrintTicketProps {
     type: 'ticket' | 'comanda' | 'report' | 'drawer';
@@ -12,8 +13,6 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         if (!data && type !== 'drawer') return null;
 
         const settings = tenant?.settings || {};
-
-        // ... existing logic ...
 
         const renderDrawerKick = () => (
             <div className="print-content" style={{ width: '80mm', height: '10mm' }}>
@@ -38,7 +37,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
         }
 
         const renderTicket = () => (
-            <div className="print-content text-black font-mono text-[11px] leading-tight w-[80mm] p-3">
+            <div className="print-content text-black font-mono text-[13px] leading-tight w-[80mm] p-3">
                 {/* Header with Logo */}
                 <div className="text-center mb-3">
                     {settings.logo && (
@@ -46,10 +45,10 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                             <img src={settings.logo} alt="Logo" className="max-h-20 object-contain" />
                         </div>
                     )}
-                    <h1 className="text-base font-bold uppercase tracking-wide">{tenant?.name}</h1>
-                    {settings.address && <p className="text-[10px] mt-1">{settings.address}</p>}
-                    {settings.phone && <p className="text-[10px]">Tel: {settings.phone}</p>}
-                    {settings.rfc && <p className="text-[10px]">RFC: {settings.rfc}</p>}
+                    <h1 className="text-lg font-bold uppercase tracking-wide">{tenant?.name || 'SnackFlow'}</h1>
+                    {settings.address && <p className="text-[12px] mt-1">{settings.address}</p>}
+                    {settings.phone && <p className="text-[12px]">Tel: {settings.phone}</p>}
+                    {settings.rfc && <p className="text-[12px]">RFC: {settings.rfc}</p>}
                 </div>
 
                 {/* Separator */}
@@ -57,21 +56,21 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
 
                 {/* Ticket Info */}
                 <div className="text-center mb-2">
-                    <p className="font-bold text-[10px]">TICKET DE VENTA</p>
-                    <p className="text-[10px]">#{data.id.slice(0, 8).toUpperCase()}</p>
-                    <p className="text-[10px]">{new Date(data.created_at).toLocaleString('es-MX')}</p>
-                    {data.cashier?.name && <p className="text-[10px]">Cajero: {data.cashier.name}</p>}
-                    {data.user?.name && <p className="text-[10px]">Vendedor: {data.user.name}</p>}
+                    <p className="font-bold text-[12px]">TICKET DE VENTA</p>
+                    <p className="text-[12px]">#{data.id.slice(0, 8).toUpperCase()}</p>
+                    <p className="text-[12px]">{new Date(data.created_at).toLocaleString('es-MX')}</p>
+                    {data.cashier?.name && <p className="text-[12px]">Cajero: {data.cashier.name}</p>}
+                    {data.user?.name && <p className="text-[12px]">Vendedor: {data.user.name}</p>}
                 </div>
 
                 <div className="border-t border-dashed border-black my-2"></div>
 
                 {/* Items Header */}
-                <div className="flex justify-between font-bold text-[10px] mb-1">
+                <div className="flex justify-between font-bold text-[12px] mb-1">
                     <span className="flex-1">PRODUCTO</span>
                     <span className="w-12 text-center">CANT</span>
-                    <span className="w-16 text-right">PRECIO</span>
-                    <span className="w-16 text-right">TOTAL</span>
+                    <span className="w-20 text-right">PRECIO</span>
+                    <span className="w-20 text-right">TOTAL</span>
                 </div>
 
                 <div className="border-t border-black mb-1"></div>
@@ -79,14 +78,14 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 {/* Items */}
                 {data.order_items?.map((item: any) => (
                     <div key={item.id} className="mb-1">
-                        <div className="flex justify-between text-[10px]">
-                            <span className="flex-1 font-medium">{item.product.name}</span>
-                            <span className="w-12 text-center">{item.quantity}</span>
-                            <span className="w-16 text-right">${item.unit_price.toFixed(2)}</span>
-                            <span className="w-16 text-right font-bold">${item.subtotal.toFixed(2)}</span>
+                        <div className="flex justify-between text-[12px]">
+                            <span className="flex-1 font-medium">{item.product?.name || 'Producto'}</span>
+                            <span className="w-12 text-center">{item.quantity || 0}</span>
+                            <span className="w-20 text-right">${(item.unit_price || 0).toFixed(2)}</span>
+                            <span className="w-20 text-right font-bold">${(item.subtotal || (item.quantity * item.unit_price) || 0).toFixed(2)}</span>
                         </div>
                         {item.notes && (
-                            <p className="text-[9px] italic text-gray-600 ml-2">* {item.notes}</p>
+                            <p className="text-[11px] italic text-gray-600 ml-2">* {item.notes}</p>
                         )}
                     </div>
                 ))}
@@ -94,34 +93,34 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 <div className="border-t border-black my-2"></div>
 
                 {/* Totals */}
-                <div className="space-y-1 text-[11px]">
+                <div className="space-y-1 text-[13px]">
                     <div className="flex justify-between">
                         <span>Subtotal:</span>
-                        <span>${data.subtotal?.toFixed(2) || data.total.toFixed(2)}</span>
+                        <span className="font-semibold">${(data.subtotal || data.total || 0).toFixed(2)}</span>
                     </div>
                     {data.tax && (
                         <div className="flex justify-between">
                             <span>IVA (16%):</span>
-                            <span>${data.tax.toFixed(2)}</span>
+                            <span className="font-semibold">${data.tax.toFixed(2)}</span>
                         </div>
                     )}
                     <div className="flex justify-between items-center border-t-2 border-black pt-1 mt-1">
-                        <span className="font-bold text-[13px]">TOTAL:</span>
-                        <span className="font-bold text-[15px]">${data.total.toFixed(2)}</span>
+                        <span className="font-bold text-[15px]">TOTAL:</span>
+                        <span className="font-bold text-[17px]">${(data.total || 0).toFixed(2)}</span>
                     </div>
                 </div>
 
                 <div className="border-t border-dashed border-black my-2"></div>
 
                 {/* Payment Info */}
-                <div className="text-[10px] space-y-1">
+                <div className="text-[12px] space-y-1">
                     <p className="font-bold">FORMA DE PAGO:</p>
                     {data.payment_method === 'mixed' && paymentDetails?.payments ? (
                         <div className="ml-2">
                             {paymentDetails.payments.map((p: any, i: number) => (
                                 <div key={i} className="flex justify-between">
                                     <span className="capitalize">{p.method === 'cash' ? 'Efectivo' : p.method === 'card' ? 'Tarjeta' : 'Transferencia'}:</span>
-                                    <span>${p.amount.toFixed(2)}</span>
+                                    <span className="font-semibold">${(p.amount || 0).toFixed(2)}</span>
                                 </div>
                             ))}
                         </div>
@@ -130,7 +129,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                             {data.payment_method === 'cash' ? 'Efectivo' :
                                 data.payment_method === 'card' ? 'Tarjeta' :
                                     data.payment_method === 'transfer' ? 'Transferencia' :
-                                        data.payment_method}
+                                        data.payment_method || 'N/A'}
                         </p>
                     )}
 
@@ -138,7 +137,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                         <>
                             <div className="flex justify-between ml-2">
                                 <span>Recibido:</span>
-                                <span>${paymentDetails.amountReceived.toFixed(2)}</span>
+                                <span className="font-semibold">${paymentDetails.amountReceived.toFixed(2)}</span>
                             </div>
                             {paymentDetails.change > 0 && (
                                 <div className="flex justify-between ml-2 font-bold">
@@ -153,7 +152,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 {data.notes && (
                     <>
                         <div className="border-t border-dashed border-black my-2"></div>
-                        <div className="text-[10px]">
+                        <div className="text-[12px]">
                             <p className="font-bold">NOTAS:</p>
                             <p className="ml-2 italic">{data.notes}</p>
                         </div>
@@ -163,13 +162,23 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 <div className="border-t-2 border-dashed border-black my-3"></div>
 
                 {/* Footer */}
-                <div className="text-center text-[9px] space-y-1">
+                <div className="text-center text-[11px] space-y-1">
                     {settings.ticketFooter && (
                         <p className="whitespace-pre-wrap mb-2">{settings.ticketFooter}</p>
                     )}
+                    {/* QR Code */}
+                    <div className="flex flex-col items-center justify-center my-3">
+                        <img
+                            src={`https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(`https://snackflow.app/invoice/${data.id}`)}`}
+                            alt="QR Facturación"
+                            className="w-20 h-20"
+                        />
+                        <p className="text-[9px] text-gray-400 mt-1">Escanea para facturar</p>
+                    </div>
+
                     <p className="font-bold">¡GRACIAS POR SU COMPRA!</p>
                     <p>www.snackflow.com</p>
-                    <p className="text-[8px] text-gray-500 mt-2">
+                    <p className="text-[10px] text-gray-500 mt-2">
                         Powered by SnackFlow POS
                     </p>
                 </div>
@@ -279,17 +288,20 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
             </div>
         );
 
-        return (
+        return createPortal(
             <div
                 ref={ref}
-                className="fixed left-[-9999px] top-0 print:left-0 print:top-0 print:absolute z-50"
-                style={{ width: '80mm' }}
+                className="print-content fixed left-0 top-0 w-[80mm] bg-white z-[9999]"
+                style={{ visibility: 'hidden' }} // Hidden on screen, visible on print via CSS rule
             >
-                {type === 'ticket' && renderTicket()}
-                {type === 'comanda' && renderComanda()}
-                {type === 'report' && renderReport()}
-                {type === 'drawer' && renderDrawerKick()}
-            </div>
+                <div className="visible-print-only">
+                    {type === 'ticket' && renderTicket()}
+                    {type === 'comanda' && renderComanda()}
+                    {type === 'report' && renderReport()}
+                    {type === 'drawer' && renderDrawerKick()}
+                </div>
+            </div>,
+            document.body
         );
     }
 );
