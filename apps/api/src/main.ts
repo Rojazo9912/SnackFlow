@@ -34,6 +34,7 @@ async function bootstrap() {
     'http://localhost:3000',
     'capacitor://localhost',
     'http://localhost',
+    'https://localhost',
     process.env.CORS_ORIGIN,
     process.env.WEB_URL,
   ].filter(Boolean);
