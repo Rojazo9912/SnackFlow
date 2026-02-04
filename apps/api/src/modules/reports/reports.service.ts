@@ -16,8 +16,9 @@ export class ReportsService {
 
   async getDailySales(tenantId: string, date?: string) {
     const targetDate = date || new Date().toISOString().split('T')[0];
-    const startOfDay = `${targetDate}T00:00:00`;
-    const endOfDay = `${targetDate}T23:59:59`;
+    // Use UTC timestamps for consistent date comparison across timezones
+    const startOfDay = `${targetDate}T00:00:00.000Z`;
+    const endOfDay = `${targetDate}T23:59:59.999Z`;
 
     const { data: orders, error } = await this.supabase
       .from('orders')
@@ -25,7 +26,7 @@ export class ReportsService {
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
       .gte('paid_at', startOfDay)
-      .lte('paid_at', endOfDay);
+      .lt('paid_at', endOfDay);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
@@ -155,8 +156,9 @@ export class ReportsService {
 
   async getSalesByHour(tenantId: string, date?: string) {
     const targetDate = date || new Date().toISOString().split('T')[0];
-    const startOfDay = `${targetDate}T00:00:00`;
-    const endOfDay = `${targetDate}T23:59:59`;
+    // Use UTC timestamps for consistent date comparison across timezones
+    const startOfDay = `${targetDate}T00:00:00.000Z`;
+    const endOfDay = `${targetDate}T23:59:59.999Z`;
 
     const { data: orders, error } = await this.supabase
       .from('orders')
@@ -164,7 +166,7 @@ export class ReportsService {
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
       .gte('paid_at', startOfDay)
-      .lte('paid_at', endOfDay);
+      .lt('paid_at', endOfDay);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
