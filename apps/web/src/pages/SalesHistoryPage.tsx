@@ -5,6 +5,7 @@ import { showToast } from '../utils/toast';
 import { Search, Filter, Printer, Eye, Calendar } from 'lucide-react';
 import { PrintTicket } from '../components/PrintTicket';
 import { useRef } from 'react';
+import { getStartOfDayISO, getEndOfDayISO } from '../utils/date';
 
 interface Order {
     id: string;
@@ -43,8 +44,8 @@ export function SalesHistoryPage() {
             // Assuming API supports date filtering
             const data = await ordersApi.getAll({
                 status: 'paid',
-                fromDate: dateFilter.from,
-                toDate: dateFilter.to
+                fromDate: getStartOfDayISO(dateFilter.from),
+                toDate: getEndOfDayISO(dateFilter.to)
             });
             setOrders(data);
         } catch (error) {
@@ -174,8 +175,8 @@ export function SalesHistoryPage() {
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                                             <span className={`px-2 py-1 rounded-full text-xs font-medium ${order.payment_method === 'cash' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' :
-                                                    order.payment_method === 'card' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
-                                                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                order.payment_method === 'card' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
                                                 }`}>
                                                 {order.payment_method === 'cash' ? 'Efectivo' :
                                                     order.payment_method === 'card' ? 'Tarjeta' :
