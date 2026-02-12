@@ -41,7 +41,7 @@ export function SalesChart({ data }: SalesChartProps) {
     // Format dates for display
     const formattedData = data.map((item) => ({
         ...item,
-        dayName: new Date(item.date).toLocaleDateString('es-MX', {
+        dayName: new Date(item.date + 'T12:00:00').toLocaleDateString('es-MX', {
             weekday: 'short',
             day: 'numeric',
         }),
