@@ -306,8 +306,7 @@ export class OrdersService {
       .insert(paymentRecords);
 
     if (paymentsError) {
-      console.error('Error creating payment records:', paymentsError);
-      // Don't fail the whole transaction, just log
+      throw new Error(`Error registrando pagos: ${paymentsError.message}`);
     }
 
     // Decrease stock for each item

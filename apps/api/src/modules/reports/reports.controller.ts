@@ -100,7 +100,7 @@ export class ReportsController {
         : await this.reportsService.generateDailySalesReportExcel(tenantId, date);
 
     const buffer = Buffer.from(rawBuffer as ArrayBuffer);
-    const filename = `ventas_${date || new Date().toISOString().split('T')[0]}`;
+    const filename = `ventas_${date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())}`;
     const contentType =
       format === 'pdf'
         ? 'application/pdf'

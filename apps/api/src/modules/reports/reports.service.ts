@@ -7,6 +7,42 @@ import type { TDocumentDefinitions } from 'pdfmake/interfaces';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const PdfPrinter = require('pdfmake');
 
+const BUSINESS_TIMEZONE = 'America/Mexico_City';
+
+/** Get current date in business timezone as YYYY-MM-DD */
+function getLocalDate(date: Date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: BUSINESS_TIMEZONE }).format(date);
+}
+
+/** Get UTC start/end bounds for a local business day */
+function getLocalDayBoundsUTC(dateStr?: string): { startOfDay: string; endOfDay: string } {
+  if (!dateStr) {
+    dateStr = getLocalDate();
+  }
+
+  // Use noon UTC as reference to calculate timezone offset (avoids DST edge cases)
+  const refDate = new Date(`${dateStr}T12:00:00Z`);
+  const utcHour = refDate.getUTCHours(); // 12
+  const localHour = parseInt(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: BUSINESS_TIMEZONE,
+      hour: 'numeric',
+      hour12: false,
+    }).format(refDate),
+  );
+  const offsetHours = localHour - utcHour;
+  const offsetMs = offsetHours * 60 * 60 * 1000;
+
+  // Local midnight converted to UTC
+  const startUTC = new Date(new Date(`${dateStr}T00:00:00.000Z`).getTime() - offsetMs);
+  const endUTC = new Date(new Date(`${dateStr}T23:59:59.999Z`).getTime() - offsetMs);
+
+  return {
+    startOfDay: startUTC.toISOString(),
+    endOfDay: endUTC.toISOString(),
+  };
+}
+
 @Injectable()
 export class ReportsService {
   constructor(
@@ -15,10 +51,8 @@ export class ReportsService {
   ) { }
 
   async getDailySales(tenantId: string, date?: string) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    // Use UTC timestamps for consistent date comparison across timezones
-    const startOfDay = `${targetDate}T00:00:00.000Z`;
-    const endOfDay = `${targetDate}T23:59:59.999Z`;
+    const targetDate = date || getLocalDate();
+    const { startOfDay, endOfDay } = getLocalDayBoundsUTC(targetDate);
 
     const { data: orders, error } = await this.supabase
       .from('orders')
@@ -155,10 +189,8 @@ export class ReportsService {
   }
 
   async getSalesByHour(tenantId: string, date?: string) {
-    const targetDate = date || new Date().toISOString().split('T')[0];
-    // Use UTC timestamps for consistent date comparison across timezones
-    const startOfDay = `${targetDate}T00:00:00.000Z`;
-    const endOfDay = `${targetDate}T23:59:59.999Z`;
+    const targetDate = date || getLocalDate();
+    const { startOfDay, endOfDay } = getLocalDayBoundsUTC(targetDate);
 
     const { data: orders, error } = await this.supabase
       .from('orders')
@@ -172,14 +204,20 @@ export class ReportsService {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
     }
 
-    // Group by hour
+    // Group by hour (in local timezone)
     const byHour: Record<number, { count: number; total: number }> = {};
     for (let i = 0; i < 24; i++) {
       byHour[i] = { count: 0, total: 0 };
     }
 
     orders?.forEach((o) => {
-      const hour = new Date(o.paid_at).getHours();
+      const hour = parseInt(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone: BUSINESS_TIMEZONE,
+          hour: 'numeric',
+          hour12: false,
+        }).format(new Date(o.paid_at)),
+      );
       byHour[hour].count++;
       byHour[hour].total += o.total || 0;
     });
@@ -252,12 +290,10 @@ export class ReportsService {
     };
   }
   async getSalesComparison(tenantId: string) {
-    const today = new Date();
-    const yesterday = new Date(today);
-    yesterday.setDate(yesterday.getDate() - 1);
-
-    const todayStr = today.toISOString().split('T')[0];
-    const yesterdayStr = yesterday.toISOString().split('T')[0];
+    const todayStr = getLocalDate();
+    const yesterdayDate = new Date();
+    yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+    const yesterdayStr = getLocalDate(yesterdayDate);
 
     const [todaySales, yesterdaySales] = await Promise.all([
       this.getDailySales(tenantId, todayStr),
@@ -422,7 +458,7 @@ export class ReportsService {
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
-      const dateStr = date.toISOString().split('T')[0];
+      const dateStr = getLocalDate(date);
 
       const sales = await this.getDailySales(tenantId, dateStr);
       trend.push({

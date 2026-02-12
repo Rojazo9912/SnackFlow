@@ -26,8 +26,8 @@ export function SalesHistoryPage() {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [dateFilter, setDateFilter] = useState({
-        from: new Date().toISOString().split('T')[0],
-        to: new Date().toISOString().split('T')[0],
+        from: new Date().toLocaleDateString('en-CA'),
+        to: new Date().toLocaleDateString('en-CA'),
     });
 
     // Printing

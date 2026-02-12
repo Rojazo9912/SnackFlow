@@ -108,29 +108,47 @@ export class CashRegisterService {
     sessionId: string,
     openingAmount: number,
   ): Promise<number> {
-    // Get cash payments linked to this session
-    const { data: cashPayments, error: cashPaymentsError } = await this.supabase
-      .from('order_payments')
-      .select('amount, order:orders!inner(id, tenant_id, status, cash_register_session_id)')
-      .eq('order.tenant_id', tenantId)
-      .eq('order.cash_register_session_id', sessionId)
-      .eq('order.status', 'paid')
-      .eq('payment_method', 'cash');
+    // Get paid orders linked to this session (using orders table directly for consistency)
+    const [ordersResult, movementsResult] = await Promise.all([
+      this.supabase
+        .from('orders')
+        .select('id, total, payment_method, payment_details')
+        .eq('tenant_id', tenantId)
+        .eq('cash_register_session_id', sessionId)
+        .eq('status', 'paid'),
+      this.supabase
+        .from('cash_movements')
+        .select('type, amount')
+        .eq('session_id', sessionId),
+    ]);
 
-    if (cashPaymentsError) {
-      throw new Error(`Error obteniendo pagos en efectivo: ${cashPaymentsError.message}`);
+    if (ordersResult.error) {
+      throw new Error(`Error obteniendo pagos en efectivo: ${ordersResult.error.message}`);
     }
 
-    const cashSales = cashPayments?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    // Calculate cash sales from orders
+    let cashSales = 0;
+    ordersResult.data?.forEach((o) => {
+      if (o.payment_method === 'mixed' && o.payment_details) {
+        let details: any = o.payment_details;
+        if (typeof details === 'string') {
+          try { details = JSON.parse(details); } catch { details = null; }
+        }
+        if (details?.payments && Array.isArray(details.payments)) {
+          details.payments.forEach((p: any) => {
+            if (p.method === 'cash') {
+              cashSales += p.amount || 0;
+            }
+          });
+        }
+      } else if (o.payment_method === 'cash') {
+        cashSales += o.total || 0;
+      }
+    });
 
-    // Get cash movements
-    const { data: movements } = await this.supabase
-      .from('cash_movements')
-      .select('type, amount')
-      .eq('session_id', sessionId);
-
+    // Calculate movements
     let movementsTotal = 0;
-    movements?.forEach((m) => {
+    movementsResult.data?.forEach((m) => {
       if (m.type === CashMovementType.DEPOSIT) {
         movementsTotal += m.amount;
       } else {

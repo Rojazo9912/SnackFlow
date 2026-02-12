@@ -209,11 +209,12 @@ export function CashierPage() {
 
   const loadRecentSales = async () => {
     try {
-      // Get completed orders from today
-      const today = new Date().toISOString().split('T')[0];
+      // Get completed orders from today (using local date boundaries)
+      const today = new Date().toLocaleDateString('en-CA');
+      const localStart = new Date(`${today}T00:00:00`).toISOString();
       const salesData = await ordersApi.getAll({
         status: 'paid',
-        fromDate: today
+        fromDate: localStart
       });
       setRecentSales(salesData.slice(0, 20)); // Last 20 sales
     } catch (error) {
