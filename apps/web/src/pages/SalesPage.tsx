@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Search, Plus, Minus, Trash2, Send, Star, LayoutGrid, List, AlertTriangle, Banknote } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { useCartStore } from '../stores/cartStore';
-import { productsApi, categoriesApi, ordersApi, tenantsApi } from '../services/api';
+import { productsApi, categoriesApi, ordersApi, tenantsApi, cashRegisterApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { useGlobalKeyboardShortcuts } from '../hooks/useGlobalKeyboardShortcuts';
@@ -46,6 +46,7 @@ export function SalesPage() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [cashSession, setCashSession] = useState<any>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   const {
@@ -77,13 +78,15 @@ export function SalesPage() {
 
   const loadData = async () => {
     try {
-      const [productsData, categoriesData, tenantData] = await Promise.all([
+      const [productsData, categoriesData, tenantData, sessionData] = await Promise.all([
         productsApi.getAll({ calculateCompositeStock: true }),
         categoriesApi.getAll(),
         tenantsApi.getCurrent(),
+        cashRegisterApi.getCurrent().catch(() => null),
       ]);
       setProducts(productsData);
       setCategories(categoriesData);
+      setCashSession(sessionData);
       if (tenantData && user) {
         user.tenant = tenantData;
       }
@@ -219,6 +222,11 @@ export function SalesPage() {
   const handleCobrar = async () => {
     if (items.length === 0) {
       showToast.warning('Agrega productos al pedido');
+      return;
+    }
+
+    if (!cashSession) {
+      showToast.error('No hay una caja abierta. Abre la caja antes de cobrar.');
       return;
     }
 
@@ -564,6 +572,12 @@ export function SalesPage() {
           <h2 className="font-semibold text-lg">
             Pedido ({getItemCount()} items)
           </h2>
+          {!cashSession && (
+            <div className="mt-2 flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 text-xs rounded-lg px-3 py-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>Caja cerrada. No podrás cobrar hasta abrir la caja.</span>
+            </div>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
@@ -634,7 +648,7 @@ export function SalesPage() {
           <div className="flex flex-col gap-2">
             <button
               onClick={handleCobrar}
-              disabled={items.length === 0 || submitting || processingPayment}
+              disabled={items.length === 0 || submitting || processingPayment || !cashSession}
               className="w-full py-3 flex items-center justify-center gap-2 rounded-xl font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
               <Banknote className="w-5 h-5" />

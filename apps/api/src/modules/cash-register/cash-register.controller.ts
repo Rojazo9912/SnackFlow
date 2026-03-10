@@ -17,7 +17,7 @@ export class CashRegisterController {
   constructor(private readonly cashRegisterService: CashRegisterService) {}
 
   @Get('current')
-  @Roles(Role.CASHIER, Role.ADMIN, Role.SUPERVISOR)
+  @Roles(Role.SELLER, Role.CASHIER, Role.ADMIN, Role.SUPERVISOR)
   @ApiOperation({ summary: 'Obtener sesion de caja actual' })
   async getCurrentSession(@CurrentUser('tenantId') tenantId: string) {
     return this.cashRegisterService.getCurrentSession(tenantId);

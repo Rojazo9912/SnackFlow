@@ -256,16 +256,12 @@ export class OrdersService {
       );
     }
 
-    // Link to current cash session if available
-    let cashSessionId = null;
-    try {
-      const session = await this.cashRegisterService.getCurrentSession(tenantId);
-      if (session) {
-        cashSessionId = session.id;
-      }
-    } catch (e) {
-      // Ignore if no session active or error, just don't link
+    // Require an open cash session to process payment
+    const session = await this.cashRegisterService.getCurrentSession(tenantId);
+    if (!session) {
+      throw new BadRequestException('No hay una caja abierta. Abre la caja antes de procesar pagos.');
     }
+    const cashSessionId = session.id;
 
     // Update order status
     const { error: orderError } = await this.supabase
