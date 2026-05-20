@@ -10,17 +10,18 @@ import {
 
 interface SalesChartProps {
     data: Array<{ date: string; total: number; orders: number }>;
+    days?: number;
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
     if (active && payload && payload.length) {
         return (
-            <div className="bg-white dark:bg-gray-900 p-3 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-                <p className="font-semibold text-gray-900 dark:text-white mb-1">{label}</p>
-                <p className="text-primary-600 font-bold">
-                    ${payload[0].value.toFixed(2)}
+            <div className="bg-white dark:bg-gray-900 p-3 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl">
+                <p className="font-semibold text-gray-900 dark:text-white mb-1 text-sm">{label}</p>
+                <p className="text-primary-600 dark:text-primary-400 font-bold">
+                    ${payload[0].value.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </p>
-                <p className="text-gray-500 dark:text-gray-400 text-sm">
+                <p className="text-gray-500 dark:text-gray-400 text-xs mt-0.5">
                     {payload[0].payload.orders} pedidos
                 </p>
             </div>
@@ -29,7 +30,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     return null;
 };
 
-export function SalesChart({ data }: SalesChartProps) {
+export function SalesChart({ data, days = 7 }: SalesChartProps) {
     if (!data || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-64 text-gray-500 bg-white dark:bg-gray-800 rounded-xl border border-gray-100 dark:border-gray-700">
@@ -51,9 +52,10 @@ export function SalesChart({ data }: SalesChartProps) {
 
     return (
         <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700 h-[400px]">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-6">
-                Ventas Últimos 7 Días
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1">
+                Ventas Últimos {days} Días
             </h3>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-5">Tendencia de ingresos diarios</p>
             <ResponsiveContainer width="100%" height="85%">
                 <BarChart data={formattedData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" className="dark:stroke-gray-700" />

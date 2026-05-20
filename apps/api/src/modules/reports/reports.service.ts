@@ -285,7 +285,7 @@ export class ReportsService {
       .slice(0, limit);
 
     return {
-      period: `${days} dias`,
+      period: `${days} días`,
       products: sorted,
     };
   }

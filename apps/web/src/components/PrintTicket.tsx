@@ -5,11 +5,13 @@ interface PrintTicketProps {
     type: 'ticket' | 'comanda' | 'report' | 'drawer';
     data: any;
     tenant: any;
+    /** YYYY-MM-DD date of the report. Defaults to today if not provided. */
+    reportDate?: string;
     ref?: React.ForwardedRef<HTMLDivElement>;
 }
 
 export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
-    ({ type, data, tenant }, ref) => {
+    ({ type, data, tenant, reportDate }, ref) => {
         if (!data && type !== 'drawer') return null;
 
         const settings = tenant?.settings || {};
@@ -237,7 +239,10 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                         </div>
                     )}
                     <h1 className="text-base font-bold uppercase">REPORTE DIARIO</h1>
-                    <p className="text-[10px]">{new Date().toLocaleDateString('es-MX', { dateStyle: 'long' })}</p>
+                    <p className="text-[10px]">
+                        {new Date(reportDate ? `${reportDate}T12:00:00` : Date.now())
+                            .toLocaleDateString('es-MX', { dateStyle: 'long' })}
+                    </p>
                     <p className="text-[10px] font-bold">{tenant?.name}</p>
                 </div>
 
@@ -284,6 +289,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 </div>
 
                 <div className="mt-6 text-center pt-3 border-t border-black text-[9px]">
+                    <p>Fecha: {new Date(reportDate ? `${reportDate}T12:00:00` : Date.now()).toLocaleDateString('es-MX', { dateStyle: 'long' })}</p>
                     <p>Impreso: {new Date().toLocaleString('es-MX')}</p>
                     <p className="text-[8px] text-gray-500 mt-1">SnackFlow POS</p>
                 </div>

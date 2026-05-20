@@ -120,34 +120,36 @@ export function DashboardPage() {
 
       {/* Charts Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SalesChart data={salesTrend} />
-        <TopProductsChart data={topProducts} />
+        <SalesChart data={salesTrend} days={7} />
+        <TopProductsChart data={topProducts} days={7} />
       </div>
 
       {/* Additional Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-xl p-6 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700">
         <div className="flex items-center gap-3 mb-4">
-          <Package className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+          <div className="rounded-xl bg-gray-100 dark:bg-gray-700 p-2">
+            <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+          </div>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
             Información Adicional
           </h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Ventas de Ayer</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Ventas de Ayer</p>
+            <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
               ${(kpis?.yesterdaySales || 0).toFixed(2)}
             </p>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Cambio Porcentual</p>
-            <p className={`text-xl font-bold ${percentChange >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Cambio vs Ayer</p>
+            <p className={`text-2xl font-extrabold ${percentChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
               {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}%
             </p>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">Última Actualización</p>
-            <p className="text-xl font-bold text-gray-900 dark:text-white">
+          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Última Actualización</p>
+            <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
               {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
             </p>
           </div>
