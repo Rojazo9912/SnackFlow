@@ -1,6 +1,3 @@
-# Este archivo es un fallback. Cada servicio de Railway debe apuntar su
-# "Root Directory" a apps/api o apps/web y usar el nixpacks.toml de su carpeta.
-
 [phases.setup]
 nixPkgs = ["nodejs_20"]
 
@@ -10,3 +7,9 @@ cmds = [
   "corepack prepare pnpm@9.15.0 --activate",
   "pnpm install --frozen-lockfile"
 ]
+
+[phases.build]
+cmds = ["pnpm --filter api build"]
+
+[start]
+cmd = "node apps/api/dist/main"
