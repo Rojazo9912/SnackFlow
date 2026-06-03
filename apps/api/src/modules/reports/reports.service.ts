@@ -98,7 +98,22 @@ export class ReportsService {
     const [ordersResult, sessionResult, movementsResult] = await Promise.all([
       this.supabase
         .from('orders')
-        .select('id, total, payment_method, payment_details')
+        .select(`
+          id,
+          total,
+          payment_method,
+          payment_details,
+          created_at,
+          user:users!orders_user_id_fkey(name),
+          order_items(
+            id,
+            quantity,
+            unit_price,
+            subtotal,
+            notes,
+            product:products(id, name, code)
+          )
+        `)
         .eq('tenant_id', tenantId)
         .eq('cash_register_session_id', sessionId)
         .eq('status', 'paid'),
@@ -184,7 +199,8 @@ export class ReportsService {
         deposits,
         withdrawals,
         expectedCash
-      }
+      },
+      orders: orders || []
     };
   }
 

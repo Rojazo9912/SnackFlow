@@ -14,6 +14,7 @@ import { TicketPreviewModal } from '../components/TicketPreviewModal';
 import { PrintTicket } from '../components/PrintTicket';
 import { useAuthStore } from '../stores/authStore';
 import { ORDER_STATUS } from '@snackflow/shared';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 
 interface Product {
   id: string;
@@ -62,6 +63,7 @@ export function SalesPage() {
   } = useCartStore();
 
   const [customerName, setCustomerName] = useState('');
+  const [showClearCartConfirm, setShowClearCartConfirm] = useState(false);
 
   // Cobrar (direct charge) flow state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -181,14 +183,10 @@ export function SalesPage() {
     return () => window.removeEventListener('low-stock-alert', handleLowStock as any);
   }, []);
 
-  // Global keyboard shortcuts
   useGlobalKeyboardShortcuts({
     onNewSale: () => {
       if (items.length > 0) {
-        if (confirm('¿Limpiar el carrito y comenzar una nueva venta?')) {
-          clearCart();
-          showToast.success('Carrito limpiado');
-        }
+        setShowClearCartConfirm(true);
       }
     },
   });
@@ -697,6 +695,21 @@ export function SalesPage() {
           tenant={user?.tenant}
         />
       </div>
+      {/* Confirm Cart Clear */}
+      <ConfirmDialog
+        isOpen={showClearCartConfirm}
+        onClose={() => setShowClearCartConfirm(false)}
+        onConfirm={() => {
+          clearCart();
+          showToast.success('Carrito limpiado');
+          setShowClearCartConfirm(false);
+        }}
+        title="Limpiar Carrito"
+        message="¿Estás seguro de limpiar el carrito y comenzar una nueva venta? Esta acción no se puede deshacer."
+        confirmText="Limpiar"
+        cancelText="Cancelar"
+        variant="danger"
+      />
     </div>
   );
 }
