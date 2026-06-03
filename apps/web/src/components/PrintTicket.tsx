@@ -230,19 +230,20 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
             </div>
         );
 
-        const renderReport = () => (
-            <div className="print-content text-black font-mono text-[11px] leading-tight w-[80mm] p-3">
-                <div className="text-center mb-3 border-b-2 border-black pb-2">
-                    {settings.logo && (
-                        <div className="mb-2 flex justify-center">
-                            <img src={settings.logo} alt="Logo" className="max-h-16 object-contain" />
-                        </div>
-                    )}
-                    <h1 className="text-base font-bold uppercase">REPORTE DIARIO</h1>
-                    <p className="text-[10px]">
-                        {new Date(reportDate ? `${reportDate}T12:00:00` : Date.now())
-                            .toLocaleDateString('es-MX', { dateStyle: 'long' })}
-                    </p>
+        const renderReport = () => {
+            const rangeLabel = data?.rangeLabel || (reportDate
+                ? new Date(`${reportDate}T12:00:00`).toLocaleDateString('es-MX', { dateStyle: 'long' })
+                : new Date().toLocaleDateString('es-MX', { dateStyle: 'long' }));
+            return (
+                <div className="print-content text-black font-mono text-[11px] leading-tight w-[80mm] p-3">
+                    <div className="text-center mb-3 border-b-2 border-black pb-2">
+                        {settings.logo && (
+                            <div className="mb-2 flex justify-center">
+                                <img src={settings.logo} alt="Logo" className="max-h-16 object-contain" />
+                            </div>
+                        )}
+                        <h1 className="text-base font-bold uppercase">REPORTE DE VENTAS</h1>
+                        <p className="text-[10px]">{rangeLabel}</p>
                     <p className="text-[10px] font-bold">{tenant?.name}</p>
                 </div>
 
@@ -266,12 +267,18 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                     {data.byPaymentMethod && (
                         <div>
                             <h2 className="font-bold border-b border-black text-[11px] mb-1">POR MÉTODO DE PAGO</h2>
-                            {Object.entries(data.byPaymentMethod).map(([method, val]: [string, any]) => (
-                                <div key={method} className="flex justify-between text-[10px]">
-                                    <span className="capitalize">{method}:</span>
-                                    <span>${val.total.toFixed(2)} ({val.count})</span>
-                                </div>
-                            ))}
+                            {Object.entries(data.byPaymentMethod).map(([method, val]: [string, any]) => {
+                                const methodLabel = method === 'cash' ? 'Efectivo' :
+                                                    method === 'card' ? 'Tarjeta' :
+                                                    method === 'transfer' ? 'Transferencia' :
+                                                    method === 'mixed' ? 'Mixto' : method;
+                                return (
+                                    <div key={method} className="flex justify-between text-[10px]">
+                                        <span className="capitalize">{methodLabel}:</span>
+                                        <span>${val.total.toFixed(2)} ({val.count})</span>
+                                    </div>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -295,6 +302,7 @@ export const PrintTicket = forwardRef<HTMLDivElement, PrintTicketProps>(
                 </div>
             </div>
         );
+    };
 
         return createPortal(
             <div

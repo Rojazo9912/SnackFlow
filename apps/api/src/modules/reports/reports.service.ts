@@ -50,17 +50,30 @@ export class ReportsService {
     private readonly supabase: SupabaseClient,
   ) { }
 
-  async getDailySales(tenantId: string, date?: string) {
-    const targetDate = date || getLocalDate();
-    const { startOfDay, endOfDay } = getLocalDayBoundsUTC(targetDate);
+  async getDailySales(tenantId: string, date?: string, fromDate?: string, toDate?: string) {
+    const targetDate = date || fromDate || getLocalDate();
+    let start: string;
+    let end: string;
+    let rangeLabel: string;
+
+    if (fromDate && toDate) {
+      start = getLocalDayBoundsUTC(fromDate).startOfDay;
+      end = getLocalDayBoundsUTC(toDate).endOfDay;
+      rangeLabel = fromDate === toDate ? fromDate : `${fromDate} al ${toDate}`;
+    } else {
+      const bounds = getLocalDayBoundsUTC(targetDate);
+      start = bounds.startOfDay;
+      end = bounds.endOfDay;
+      rangeLabel = targetDate;
+    }
 
     const { data: orders, error } = await this.supabase
       .from('orders')
-      .select('id, total, payment_method, paid_at')
+      .select('id, total, payment_method, payment_details, paid_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
-      .gte('paid_at', startOfDay)
-      .lt('paid_at', endOfDay);
+      .gte('paid_at', start)
+      .lt('paid_at', end);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
@@ -73,12 +86,47 @@ export class ReportsService {
     // Group by payment method
     const byPaymentMethod = orders?.reduce(
       (acc, o) => {
-        const method = o.payment_method || 'other';
-        if (!acc[method]) {
-          acc[method] = { count: 0, total: 0 };
+        if (o.payment_method === 'mixed' && o.payment_details) {
+          let details: any = o.payment_details as any;
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch {
+              details = null;
+            }
+          }
+
+          if (details && details.payments && Array.isArray(details.payments)) {
+            details.payments.forEach((p: any) => {
+              const method = p.method || 'other';
+              if (!acc[method]) {
+                acc[method] = { count: 0, total: 0 };
+              }
+              acc[method].count++;
+              acc[method].total += p.amount || 0;
+            });
+
+            if (!acc['mixed']) {
+              acc['mixed'] = { count: 0, total: 0 };
+            }
+            acc['mixed'].count++;
+            acc['mixed'].total += o.total || 0;
+          } else {
+            const method = 'mixed';
+            if (!acc[method]) {
+              acc[method] = { count: 0, total: 0 };
+            }
+            acc[method].count++;
+            acc[method].total += o.total || 0;
+          }
+        } else {
+          const method = o.payment_method || 'other';
+          if (!acc[method]) {
+            acc[method] = { count: 0, total: 0 };
+          }
+          acc[method].count++;
+          acc[method].total += o.total || 0;
         }
-        acc[method].count++;
-        acc[method].total += o.total || 0;
         return acc;
       },
       {} as Record<string, { count: number; total: number }>,
@@ -86,6 +134,7 @@ export class ReportsService {
 
     return {
       date: targetDate,
+      rangeLabel,
       totalSales,
       ticketCount,
       averageTicket: Math.round(averageTicket * 100) / 100,
@@ -204,17 +253,27 @@ export class ReportsService {
     };
   }
 
-  async getSalesByHour(tenantId: string, date?: string) {
-    const targetDate = date || getLocalDate();
-    const { startOfDay, endOfDay } = getLocalDayBoundsUTC(targetDate);
+  async getSalesByHour(tenantId: string, date?: string, fromDate?: string, toDate?: string) {
+    let start: string;
+    let end: string;
+
+    if (fromDate && toDate) {
+      start = getLocalDayBoundsUTC(fromDate).startOfDay;
+      end = getLocalDayBoundsUTC(toDate).endOfDay;
+    } else {
+      const targetDate = date || getLocalDate();
+      const bounds = getLocalDayBoundsUTC(targetDate);
+      start = bounds.startOfDay;
+      end = bounds.endOfDay;
+    }
 
     const { data: orders, error } = await this.supabase
       .from('orders')
       .select('total, paid_at')
       .eq('tenant_id', tenantId)
       .eq('status', 'paid')
-      .gte('paid_at', startOfDay)
-      .lt('paid_at', endOfDay);
+      .gte('paid_at', start)
+      .lt('paid_at', end);
 
     if (error) {
       throw new Error(`Error obteniendo ventas: ${error.message}`);
@@ -238,6 +297,7 @@ export class ReportsService {
       byHour[hour].total += o.total || 0;
     });
 
+    const targetDate = date || fromDate || getLocalDate();
     return {
       date: targetDate,
       byHour,
@@ -359,10 +419,10 @@ export class ReportsService {
     return data?.filter((p) => p.stock <= p.min_stock).length || 0;
   }
 
-  async generateDailySalesReportExcel(tenantId: string, date?: string) {
-    const data = await this.getDailySales(tenantId, date);
+  async generateDailySalesReportExcel(tenantId: string, date?: string, fromDate?: string, toDate?: string) {
+    const data = await this.getDailySales(tenantId, date, fromDate, toDate);
     const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Ventas Diarias');
+    const worksheet = workbook.addWorksheet('Ventas');
 
     // Styling
     worksheet.columns = [
@@ -370,7 +430,7 @@ export class ReportsService {
       { header: 'Valor', key: 'value', width: 20 },
     ];
 
-    worksheet.addRow({ label: 'Fecha de Reporte', value: data.date });
+    worksheet.addRow({ label: 'Fecha / Período', value: data.rangeLabel });
     worksheet.addRow({ label: 'Total de Ventas', value: data.totalSales });
     worksheet.addRow({ label: 'Cantidad de Tickets', value: data.ticketCount });
     worksheet.addRow({ label: 'Ticket Promedio', value: data.averageTicket });
@@ -378,8 +438,12 @@ export class ReportsService {
     worksheet.addRow({ label: 'Ventas por Método de Pago' }).font = { bold: true };
 
     Object.entries(data.byPaymentMethod || {}).forEach(([method, stats]: [string, any]) => {
+      const methodLabel = method === 'cash' ? 'EFECTIVO' :
+                          method === 'card' ? 'TARJETA' :
+                          method === 'transfer' ? 'TRANSFERENCIA' :
+                          method === 'mixed' ? 'MIXTO' : method.toUpperCase();
       worksheet.addRow({
-        label: method.toUpperCase(),
+        label: methodLabel,
         value: `${stats.total} (${stats.count} tickets)`,
       });
     });
@@ -387,13 +451,13 @@ export class ReportsService {
     return workbook.xlsx.writeBuffer();
   }
 
-  async generateDailySalesReportPDF(tenantId: string, date?: string): Promise<Buffer> {
-    const data = await this.getDailySales(tenantId, date);
+  async generateDailySalesReportPDF(tenantId: string, date?: string, fromDate?: string, toDate?: string): Promise<Buffer> {
+    const data = await this.getDailySales(tenantId, date, fromDate, toDate);
 
     const docDefinition: TDocumentDefinitions = {
       content: [
-        { text: 'SnackFlow - Reporte de Ventas Diarias', style: 'header' },
-        { text: `Fecha: ${data.date}`, margin: [0, 10, 0, 20] },
+        { text: 'SnackFlow - Reporte de Ventas', style: 'header' },
+        { text: `Período: ${data.rangeLabel}`, margin: [0, 10, 0, 20] },
         {
           table: {
             widths: ['*', '*'],
@@ -411,11 +475,17 @@ export class ReportsService {
             widths: ['*', '*', '*'],
             body: [
               ['Método', 'Ventas', 'Tickets'],
-              ...Object.entries(data.byPaymentMethod || {}).map(([method, stats]: [string, any]) => [
-                method.toUpperCase(),
-                `$${stats.total.toFixed(2)}`,
-                stats.count.toString(),
-              ]),
+              ...Object.entries(data.byPaymentMethod || {}).map(([method, stats]: [string, any]) => {
+                const methodLabel = method === 'cash' ? 'EFECTIVO' :
+                                    method === 'card' ? 'TARJETA' :
+                                    method === 'transfer' ? 'TRANSFERENCIA' :
+                                    method === 'mixed' ? 'MIXTO' : method.toUpperCase();
+                return [
+                  methodLabel,
+                  `$${stats.total.toFixed(2)}`,
+                  stats.count.toString(),
+                ];
+              }),
             ],
           },
         },
