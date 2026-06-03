@@ -25,6 +25,11 @@ import { RecentSalesModal } from '../components/cashier/RecentSalesModal';
 import { OrderDetail } from '../components/cashier/OrderDetail';
 import { ORDER_STATUS } from '@snackflow/shared';
 
+// New Modals
+import { OpenRegisterModal } from '../components/cashier/OpenRegisterModal';
+import { CancelOrderModal } from '../components/cashier/CancelOrderModal';
+import { CloseRegisterModal } from '../components/cashier/CloseRegisterModal';
+
 interface Order {
   id: string;
   status: string;
@@ -50,6 +55,11 @@ export function CashierPage() {
   const [cashSession, setCashSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [processingPayment, setProcessingPayment] = useState(false);
+
+  // New Modals State
+  const [showOpenModal, setShowOpenModal] = useState(false);
+  const [showCloseModal, setShowCloseModal] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState<Order | null>(null);
 
   // Payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -111,16 +121,7 @@ export function CashierPage() {
   useGlobalKeyboardShortcuts({
     onOpenCashRegister: () => {
       if (!cashSession) {
-        const amount = prompt('Monto inicial de caja:');
-        if (!amount) return;
-        cashRegisterApi.open(parseFloat(amount))
-          .then(() => {
-            showToast.success('Caja abierta');
-            loadData();
-          })
-          .catch((error: any) => {
-            showToast.error(error.message || 'Error abriendo caja');
-          });
+        setShowOpenModal(true);
       }
     },
     onProcessPayment: () => {
@@ -305,19 +306,19 @@ export function CashierPage() {
     }, 300);
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    // Enhanced validation: Confirm cancellation
-    const confirmCancel = window.confirm(
-      '¿Estás seguro de cancelar este pedido? Esta acción no se puede deshacer.'
-    );
-    if (!confirmCancel) return;
+  const handleCancelOrder = (orderId: string) => {
+    const order = orders.find(o => o.id === orderId) || selectedOrder;
+    if (order) {
+      setOrderToCancel(order);
+    }
+  };
 
-    const reason = prompt('Motivo de cancelación:');
-    if (!reason) return;
-
+  const handleConfirmCancel = async (reason: string) => {
+    if (!orderToCancel) return;
     try {
-      await ordersApi.cancel(orderId, reason);
+      await ordersApi.cancel(orderToCancel.id, reason);
       showToast.success('Pedido cancelado');
+      setOrderToCancel(null);
       setSelectedOrder(null);
       loadOrders();
     } catch (error: any) {
@@ -348,70 +349,18 @@ export function CashierPage() {
     }
   };
 
-  const handleCloseRegister = async () => {
+  const handleCloseRegister = () => {
     if (!cashSession) return;
+    setShowCloseModal(true);
+  };
 
-    // Check for pending orders
-    if (orders.length > 0) {
-      const confirmClose = window.confirm(
-        `Hay ${orders.length} pedidos pendientes. ¿Estás seguro de cerrar la caja?`
-      );
-      if (!confirmClose) return;
-    }
-
-    let expectedTotal = 0;
-    let calculationSuccess = false;
-
-    try {
-      showToast.info('Calculando ventas y movimientos...', { duration: 2000 });
-
-      // Now getCashSessionSummary returns everything we need including expectedCash
-      const summary = await reportsApi.getCashSessionSummary(cashSession.id);
-
-      if (summary.cashFlow?.expectedCash !== undefined) {
-        expectedTotal = summary.cashFlow.expectedCash;
-        calculationSuccess = true;
-      } else {
-        // Fallback for safety if API hasn't updated yet or old version
-        const movements = await cashRegisterApi.getMovements();
-        const openingAmount = cashSession.opening_amount || 0;
-        const cashSales = summary.byPaymentMethod.cash || 0;
-
-        let movementsTotal = 0;
-        movements.forEach((m: any) => {
-          if (m.type === 'deposit') movementsTotal += m.amount;
-          else if (m.type === 'withdrawal') movementsTotal -= m.amount;
-        });
-
-        expectedTotal = openingAmount + cashSales + movementsTotal;
-        calculationSuccess = true;
-      }
-    } catch (error) {
-      console.error('Error calculando total esperado:', error);
-    }
-
-    const promptMessage = calculationSuccess
-      ? `Monto final contado:\n(Esperado: $${expectedTotal.toFixed(2)})`
-      : 'Monto final contado:';
-
-    const defaultValue = calculationSuccess ? expectedTotal.toFixed(2) : '';
-
-    const amountStr = prompt(promptMessage, defaultValue);
-
-    if (!amountStr) return;
-
-    const amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount < 0) {
-      showToast.error('Monto inválido');
-      return;
-    }
-
+  const handleConfirmClose = async (amount: number) => {
     try {
       const result = await cashRegisterApi.close(amount);
-
       showToast.success(
         `Caja cerrada. Diferencia: $${result.difference.toFixed(2)}`
       );
+      setShowCloseModal(false);
       loadData();
 
       // Auto-print Z Report
@@ -442,21 +391,26 @@ export function CashierPage() {
           Debes abrir la caja para comenzar a recibir pedidos
         </p>
         <button
-          onClick={async () => {
-            const amount = prompt('Monto inicial de caja:');
-            if (!amount) return;
+          onClick={() => setShowOpenModal(true)}
+          className="btn-primary font-bold shadow-md shadow-primary-500/10"
+        >
+          Abrir Caja
+        </button>
+
+        <OpenRegisterModal
+          isOpen={showOpenModal}
+          onClose={() => setShowOpenModal(false)}
+          onConfirm={async (amount) => {
             try {
-              await cashRegisterApi.open(parseFloat(amount));
+              await cashRegisterApi.open(amount);
               showToast.success('Caja abierta');
+              setShowOpenModal(false);
               loadData();
             } catch (error: any) {
               showToast.error(error.message || 'Error abriendo caja');
             }
           }}
-          className="btn-primary"
-        >
-          Abrir Caja
-        </button>
+        />
       </div>
     );
   }
@@ -708,6 +662,43 @@ export function CashierPage() {
           isOpen={showKeyboardHelp}
           onClose={() => setShowKeyboardHelp(false)}
         />
+
+        {/* Open Cash Register Modal */}
+        <OpenRegisterModal
+          isOpen={showOpenModal}
+          onClose={() => setShowOpenModal(false)}
+          onConfirm={async (amount) => {
+            try {
+              await cashRegisterApi.open(amount);
+              showToast.success('Caja abierta');
+              setShowOpenModal(false);
+              loadData();
+            } catch (error: any) {
+              showToast.error(error.message || 'Error abriendo caja');
+            }
+          }}
+        />
+
+        {/* Cancel Order Modal */}
+        {orderToCancel && (
+          <CancelOrderModal
+            isOpen={!!orderToCancel}
+            onClose={() => setOrderToCancel(null)}
+            orderId={orderToCancel.id}
+            onConfirm={handleConfirmCancel}
+          />
+        )}
+
+        {/* Close Register Modal */}
+        {cashSession && (
+          <CloseRegisterModal
+            isOpen={showCloseModal}
+            onClose={() => setShowCloseModal(false)}
+            sessionId={cashSession.id}
+            pendingOrdersCount={orders.length}
+            onConfirm={handleConfirmClose}
+          />
+        )}
       </div>
     </div>
   );

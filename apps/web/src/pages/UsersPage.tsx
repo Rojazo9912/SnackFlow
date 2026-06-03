@@ -5,6 +5,7 @@ import { usersApi } from '../services/api';
 import { Header } from '../components/Header';
 import { EmptyState } from '../components/EmptyState';
 import { ROLES, ROLE_LABELS, type UserRole } from '@snackflow/shared';
+import { UpdatePinModal } from '../components/UpdatePinModal';
 
 interface User {
   id: string;
@@ -27,6 +28,7 @@ export function UsersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userToUpdatePin, setUserToUpdatePin] = useState<User | null>(null);
 
   // Form state
   const [formData, setFormData] = useState<FormData>({
@@ -84,16 +86,16 @@ export function UsersPage() {
     }
   };
 
-  const handleUpdatePin = async (user: User) => {
-    const pin = prompt('Nuevo PIN (4-6 digitos:');
-    if (!pin || pin.length < 4 || pin.length > 6) {
-      showToast.error('PIN invalido');
-      return;
-    }
+  const handleUpdatePin = (user: User) => {
+    setUserToUpdatePin(user);
+  };
 
+  const handleConfirmPinUpdate = async (pin: string) => {
+    if (!userToUpdatePin) return;
     try {
-      await usersApi.updatePin(user.id, pin);
+      await usersApi.updatePin(userToUpdatePin.id, pin);
       showToast.success('PIN actualizado');
+      setUserToUpdatePin(null);
     } catch (error: any) {
       showToast.error(error.message || 'Error actualizando PIN');
     }
@@ -319,6 +321,15 @@ export function UsersPage() {
             </form>
           </div>
         </div>
+      )}
+      {/* Update PIN Modal */}
+      {userToUpdatePin && (
+        <UpdatePinModal
+          isOpen={!!userToUpdatePin}
+          onClose={() => setUserToUpdatePin(null)}
+          userName={userToUpdatePin.name}
+          onConfirm={handleConfirmPinUpdate}
+        />
       )}
     </div>
   );
