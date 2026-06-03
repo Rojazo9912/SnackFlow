@@ -24,21 +24,29 @@ export class ReportsController {
   @Get('daily-sales')
   @ApiOperation({ summary: 'Obtener ventas del dia' })
   @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'fromDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'toDate', required: false, description: 'YYYY-MM-DD' })
   async getDailySales(
     @CurrentUser('tenantId') tenantId: string,
     @Query('date') date?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
-    return this.reportsService.getDailySales(tenantId, date);
+    return this.reportsService.getDailySales(tenantId, date, fromDate, toDate);
   }
 
   @Get('sales-by-hour')
   @ApiOperation({ summary: 'Obtener ventas por hora' })
   @ApiQuery({ name: 'date', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'fromDate', required: false, description: 'YYYY-MM-DD' })
+  @ApiQuery({ name: 'toDate', required: false, description: 'YYYY-MM-DD' })
   async getSalesByHour(
     @CurrentUser('tenantId') tenantId: string,
     @Query('date') date?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
   ) {
-    return this.reportsService.getSalesByHour(tenantId, date);
+    return this.reportsService.getSalesByHour(tenantId, date, fromDate, toDate);
   }
 
   @Get('top-products')
@@ -87,20 +95,33 @@ export class ReportsController {
   @Get('daily-sales/export')
   @ApiOperation({ summary: 'Exportar ventas del dia' })
   @ApiQuery({ name: 'date', required: false })
+  @ApiQuery({ name: 'fromDate', required: false })
+  @ApiQuery({ name: 'toDate', required: false })
   @ApiQuery({ name: 'format', required: false, enum: ['excel', 'pdf'] })
   async exportDailySales(
     @CurrentUser('tenantId') tenantId: string,
     @Res() res: Response,
     @Query('date') date?: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
     @Query('format') format: 'excel' | 'pdf' = 'excel',
   ) {
     const rawBuffer =
       format === 'pdf'
-        ? await this.reportsService.generateDailySalesReportPDF(tenantId, date)
-        : await this.reportsService.generateDailySalesReportExcel(tenantId, date);
+        ? await this.reportsService.generateDailySalesReportPDF(tenantId, date, fromDate, toDate)
+        : await this.reportsService.generateDailySalesReportExcel(tenantId, date, fromDate, toDate);
 
     const buffer = Buffer.from(rawBuffer as ArrayBuffer);
-    const filename = `ventas_${date || new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date())}`;
+    
+    let rangeStr = date;
+    if (!rangeStr) {
+      if (fromDate && toDate) {
+        rangeStr = `${fromDate}_a_${toDate}`;
+      } else {
+        rangeStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Mexico_City' }).format(new Date());
+      }
+    }
+    const filename = `ventas_${rangeStr}`;
     const contentType =
       format === 'pdf'
         ? 'application/pdf'

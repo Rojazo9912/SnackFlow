@@ -131,7 +131,8 @@ function HourBar({
 // ─── main page ────────────────────────────────────────────────────────────────
 
 export function ReportsPage() {
-  const [date, setDate] = useState(getTodayLocal());
+  const today = getTodayLocal();
+  const [dateFilter, setDateFilter] = useState({ from: today, to: today });
   const [dailySales, setDailySales] = useState<any>(null);
   const [salesByHour, setSalesByHour] = useState<any>(null);
   const [topProducts, setTopProducts] = useState<any>(null);
@@ -148,7 +149,7 @@ export function ReportsPage() {
 
   const handleExportExcel = async () => {
     try {
-      await reportsApi.exportDailySales({ date, format: 'excel' });
+      await reportsApi.exportDailySales({ fromDate: dateFilter.from, toDate: dateFilter.to, format: 'excel' });
       showToast.success('Reporte Excel generado');
     } catch {
       showToast.error('Error exportando a Excel');
@@ -157,7 +158,7 @@ export function ReportsPage() {
 
   const handleExportPdf = async () => {
     try {
-      await reportsApi.exportDailySales({ date, format: 'pdf' });
+      await reportsApi.exportDailySales({ fromDate: dateFilter.from, toDate: dateFilter.to, format: 'pdf' });
       showToast.success('Reporte PDF generado');
     } catch {
       showToast.error('Error exportando a PDF');
@@ -175,15 +176,15 @@ export function ReportsPage() {
 
   useEffect(() => {
     loadReports();
-  }, [date]);
+  }, [dateFilter]);
 
   const loadReports = async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
       const [daily, byHour, top] = await Promise.all([
-        reportsApi.getDailySales(date),
-        reportsApi.getSalesByHour(date),
+        reportsApi.getDailySales(undefined, dateFilter.from, dateFilter.to),
+        reportsApi.getSalesByHour(undefined, dateFilter.from, dateFilter.to),
         reportsApi.getTopProducts(7, 10),
       ]);
       setDailySales(daily);
@@ -198,7 +199,9 @@ export function ReportsPage() {
   };
 
   // ── date display (fix: parse with noon anchor to avoid UTC-offset bug) ──
-  const displayDate = parseLocalDate(date).toLocaleDateString('es-MX', { dateStyle: 'long' });
+  const displayDate = dateFilter.from === dateFilter.to
+    ? parseLocalDate(dateFilter.from).toLocaleDateString('es-MX', { dateStyle: 'long' })
+    : `Del ${parseLocalDate(dateFilter.from).toLocaleDateString('es-MX', { dateStyle: 'short' })} al ${parseLocalDate(dateFilter.to).toLocaleDateString('es-MX', { dateStyle: 'short' })}`;
 
   // ── hours chart ──────────────────────────────────────────────────────────
   const hourEntries: Array<{ hour: string; total: number; count: number }> = [];
@@ -237,14 +240,23 @@ export function ReportsPage() {
         subtitle={displayDate}
         actions={
           <div className="flex flex-wrap items-center gap-2 no-print">
-            {/* Date picker */}
+            {/* Date range picker */}
             <div className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 dark:border-gray-700 dark:bg-gray-800">
-              <Calendar className="h-4 w-4 text-gray-400" />
+              <Calendar className="h-4 w-4 text-gray-400 animate-pulse" />
               <input
                 type="date"
-                value={date}
+                value={dateFilter.from}
+                max={dateFilter.to}
+                onChange={(e) => setDateFilter(prev => ({ ...prev, from: e.target.value }))}
+                className="border-0 bg-transparent text-sm text-gray-900 focus:ring-0 dark:text-white"
+              />
+              <span className="text-gray-400">a</span>
+              <input
+                type="date"
+                value={dateFilter.to}
+                min={dateFilter.from}
                 max={getTodayLocal()}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => setDateFilter(prev => ({ ...prev, to: e.target.value }))}
                 className="border-0 bg-transparent text-sm text-gray-900 focus:ring-0 dark:text-white"
               />
             </div>
@@ -502,7 +514,7 @@ export function ReportsPage() {
       <PrintTicket
         ref={printRef}
         type="report"
-        reportDate={date}
+        reportDate={dateFilter.from === dateFilter.to ? dateFilter.from : undefined}
         data={{
           ...dailySales,
           topProducts: topProducts?.products,

@@ -369,19 +369,33 @@ export const inventoryApi = {
 // Reports
 export const reportsApi = {
   getDashboard: () => api.get<any>('/reports/dashboard'),
-  getDailySales: (date?: string) =>
-    api.get<any>(`/reports/daily-sales${date ? `?date=${date}` : ''}`),
-  getSalesByHour: (date?: string) =>
-    api.get<any>(`/reports/sales-by-hour${date ? `?date=${date}` : ''}`),
+  getDailySales: (date?: string, fromDate?: string, toDate?: string) => {
+    const searchParams = new URLSearchParams();
+    if (date) searchParams.set('date', date);
+    if (fromDate) searchParams.set('fromDate', fromDate);
+    if (toDate) searchParams.set('toDate', toDate);
+    const query = searchParams.toString();
+    return api.get<any>(`/reports/daily-sales${query ? `?${query}` : ''}`);
+  },
+  getSalesByHour: (date?: string, fromDate?: string, toDate?: string) => {
+    const searchParams = new URLSearchParams();
+    if (date) searchParams.set('date', date);
+    if (fromDate) searchParams.set('fromDate', fromDate);
+    if (toDate) searchParams.set('toDate', toDate);
+    const query = searchParams.toString();
+    return api.get<any>(`/reports/sales-by-hour${query ? `?${query}` : ''}`);
+  },
   getTopProducts: (days = 7, limit = 10) =>
     api.get<any>(`/reports/top-products?days=${days}&limit=${limit}`),
   getComparison: () => api.get<any>('/reports/comparison'),
   getSalesTrend: (days = 7) => api.get<any>(`/reports/sales-trend?days=${days}`),
   getKPIs: () => api.get<any>('/reports/kpis'),
   getCashSessionSummary: (sessionId: string) => api.get<any>(`/reports/cash-session/${sessionId}/summary`),
-  exportDailySales: async (params?: { date?: string; format?: 'excel' | 'pdf' }) => {
+  exportDailySales: async (params?: { date?: string; fromDate?: string; toDate?: string; format?: 'excel' | 'pdf' }) => {
     const searchParams = new URLSearchParams();
     if (params?.date) searchParams.set('date', params.date);
+    if (params?.fromDate) searchParams.set('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.set('toDate', params.toDate);
     if (params?.format) searchParams.set('format', params.format);
 
     const token = useAuthStore.getState().accessToken;
@@ -395,7 +409,16 @@ export const reportsApi = {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `reporte_ventas_${params?.date || new Date().toISOString().split('T')[0]}.${params?.format === 'pdf' ? 'pdf' : 'xlsx'}`;
+    
+    let rangeStr = params?.date;
+    if (!rangeStr) {
+      if (params?.fromDate && params?.toDate) {
+        rangeStr = `${params.fromDate}_a_${params.toDate}`;
+      } else {
+        rangeStr = new Date().toISOString().split('T')[0];
+      }
+    }
+    a.download = `reporte_ventas_${rangeStr}.${params?.format === 'pdf' ? 'pdf' : 'xlsx'}`;
     document.body.appendChild(a);
     a.click();
     window.URL.revokeObjectURL(url);
