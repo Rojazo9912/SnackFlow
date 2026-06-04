@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Calendar,
   Printer,
@@ -19,7 +19,6 @@ import {
 } from 'lucide-react';
 import { showToast } from '../utils/toast';
 import { reportsApi } from '../services/api';
-import { useRef } from 'react';
 import { PrintTicket } from '../components/PrintTicket';
 import { useAuthStore } from '../stores/authStore';
 import { Header } from '../components/Header';
@@ -138,6 +137,7 @@ export function ReportsPage() {
   const [topProducts, setTopProducts] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const isFirstLoad = useRef(true);
 
   const printRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
@@ -174,11 +174,7 @@ export function ReportsPage() {
     }
   };
 
-  useEffect(() => {
-    loadReports();
-  }, [dateFilter]);
-
-  const loadReports = async (silent = false) => {
+  const loadReports = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     else setRefreshing(true);
     try {
@@ -196,7 +192,14 @@ export function ReportsPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [dateFilter]);
+
+  useEffect(() => {
+    // First render → show full loading screen; date changes → silent refresh only
+    const silent = !isFirstLoad.current;
+    isFirstLoad.current = false;
+    loadReports(silent);
+  }, [dateFilter]);
 
   // ── date display (fix: parse with noon anchor to avoid UTC-offset bug) ──
   const displayDate = dateFilter.from === dateFilter.to
