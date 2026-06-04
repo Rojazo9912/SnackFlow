@@ -14,6 +14,18 @@ function getLocalDate(date: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', { timeZone: BUSINESS_TIMEZONE }).format(date);
 }
 
+/** Get list of date strings YYYY-MM-DD in range */
+function getDaysArray(startStr: string, endStr: string): string[] {
+  const dates: string[] = [];
+  const start = new Date(`${startStr}T12:00:00`);
+  const end = new Date(`${endStr}T12:00:00`);
+  
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    dates.push(d.toISOString().split('T')[0]);
+  }
+  return dates;
+}
+
 /** Get UTC start/end bounds for a local business day */
 function getLocalDayBoundsUTC(dateStr?: string): { startOfDay: string; endOfDay: string } {
   if (!dateStr) {
@@ -205,6 +217,7 @@ export class ReportsService {
       averageTicket: Math.round(averageTicket * 100) / 100,
       byPaymentMethod,
       comparison,
+      orders: orders || [],
     };
   }
 
@@ -485,17 +498,80 @@ export class ReportsService {
     return data?.filter((p) => p.stock <= p.min_stock).length || 0;
   }
 
-  async generateDailySalesReportExcel(tenantId: string, date?: string, fromDate?: string, toDate?: string) {
-    const data = await this.getDailySales(tenantId, date, fromDate, toDate);
-    const workbook = new ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Ventas');
+  private calculateDailySalesFromOrders(orders: any[], targetDate: string) {
+    const totalSales = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
+    const ticketCount = orders?.length || 0;
+    const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
 
-    // Styling
+    // Group by payment method
+    const byPaymentMethod = orders?.reduce(
+      (acc, o) => {
+        if (o.payment_method === 'mixed' && o.payment_details) {
+          let details: any = o.payment_details as any;
+          if (typeof details === 'string') {
+            try {
+              details = JSON.parse(details);
+            } catch {
+              details = null;
+            }
+          }
+
+          if (details && details.payments && Array.isArray(details.payments)) {
+            details.payments.forEach((p: any) => {
+              const method = p.method || 'other';
+              if (!acc[method]) {
+                acc[method] = { count: 0, total: 0 };
+              }
+              acc[method].count++;
+              acc[method].total += p.amount || 0;
+            });
+
+            if (!acc['mixed']) {
+              acc['mixed'] = { count: 0, total: 0 };
+            }
+            acc['mixed'].count++;
+            acc['mixed'].total += o.total || 0;
+          } else {
+            const method = 'mixed';
+            if (!acc[method]) {
+              acc[method] = { count: 0, total: 0 };
+            }
+            acc[method].count++;
+            acc[method].total += o.total || 0;
+          }
+        } else {
+          const method = o.payment_method || 'other';
+          if (!acc[method]) {
+            acc[method] = { count: 0, total: 0 };
+          }
+          acc[method].count++;
+          acc[method].total += o.total || 0;
+        }
+        return acc;
+      },
+      {} as Record<string, { count: number; total: number }>,
+    );
+
+    return {
+      date: targetDate,
+      rangeLabel: targetDate,
+      totalSales,
+      ticketCount,
+      averageTicket: Math.round(averageTicket * 100) / 100,
+      byPaymentMethod,
+      comparison: null,
+    };
+  }
+
+  private populateWorksheet(worksheet: ExcelJS.Worksheet, data: any, title: string) {
     worksheet.columns = [
       { header: 'Concepto', key: 'label', width: 30 },
-      { header: 'Valor', key: 'value', width: 20 },
+      { header: 'Valor', key: 'value', width: 30 },
     ];
 
+    const titleRow = worksheet.addRow({ label: title, value: '' });
+    titleRow.font = { bold: true, size: 12 };
+    
     worksheet.addRow({ label: 'Fecha / Período', value: data.rangeLabel });
     worksheet.addRow({ label: 'Total de Ventas', value: data.totalSales });
     if (data.comparison) {
@@ -525,52 +601,121 @@ export class ReportsService {
         value: `${stats.total} (${stats.count} tickets)`,
       });
     });
+  }
+
+  private getPDFReportContent(data: any, title: string): any[] {
+    const tableBody = [
+      ['Concepto', 'Valor Actual', 'vs Período Anterior'],
+      ['Total de Ventas', `$${data.totalSales.toFixed(2)}`, data.comparison ? `$${data.comparison.prevTotalSales.toFixed(2)} (${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%)` : 'N/A'],
+      ['Cantidad de Tickets', data.ticketCount.toString(), data.comparison ? `${data.comparison.prevTicketCount} (${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%)` : 'N/A'],
+      ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`, data.comparison ? `$${data.comparison.prevAverageTicket.toFixed(2)} (${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%)` : 'N/A'],
+    ];
+
+    if (!data.comparison) {
+      tableBody.forEach(row => row.pop());
+      tableBody[0][1] = 'Valor';
+    }
+
+    return [
+      { text: `SnackFlow - ${title}`, style: 'header' },
+      { text: `Período / Fecha: ${data.rangeLabel}`, margin: [0, 5, 0, 15] },
+      {
+        table: {
+          widths: data.comparison ? ['*', '*', '*'] : ['*', '*'],
+          body: tableBody,
+        },
+      },
+      { text: '\nResumen por Método de Pago', style: 'subheader' },
+      {
+        table: {
+          widths: ['*', '*', '*'],
+          body: [
+            ['Método', 'Ventas', 'Tickets'],
+            ...Object.entries(data.byPaymentMethod || {}).map(([method, stats]: [string, any]) => {
+              const methodLabel = method === 'cash' ? 'EFECTIVO' :
+                                  method === 'card' ? 'TARJETA' :
+                                  method === 'transfer' ? 'TRANSFERENCIA' :
+                                  method === 'mixed' ? 'MIXTO' : method.toUpperCase();
+              return [
+                methodLabel,
+                `$${stats.total.toFixed(2)}`,
+                stats.count.toString(),
+              ];
+            }),
+          ],
+        },
+      },
+    ];
+  }
+
+  async generateDailySalesReportExcel(tenantId: string, date?: string, fromDate?: string, toDate?: string) {
+    const workbook = new ExcelJS.Workbook();
+    
+    const accumData = await this.getDailySales(tenantId, date, fromDate, toDate);
+    const accumSheet = workbook.addWorksheet('Acumulado');
+    this.populateWorksheet(accumSheet, accumData, 'Resumen Acumulado');
+
+    if (fromDate && toDate && fromDate !== toDate) {
+      const days = getDaysArray(fromDate, toDate);
+      
+      const ordersByDay: Record<string, any[]> = {};
+      accumData.orders.forEach((o: any) => {
+        const dateStr = getLocalDate(new Date(o.paid_at));
+        if (!ordersByDay[dateStr]) {
+          ordersByDay[dateStr] = [];
+        }
+        ordersByDay[dateStr].push(o);
+      });
+
+      days.forEach((day) => {
+        const dayOrders = ordersByDay[day] || [];
+        if (dayOrders.length > 0) {
+          const dayData = this.calculateDailySalesFromOrders(dayOrders, day);
+          const daySheet = workbook.addWorksheet(day);
+          this.populateWorksheet(daySheet, dayData, `Reporte del día ${day}`);
+        }
+      });
+    }
 
     return workbook.xlsx.writeBuffer();
   }
 
   async generateDailySalesReportPDF(tenantId: string, date?: string, fromDate?: string, toDate?: string): Promise<Buffer> {
-    const data = await this.getDailySales(tenantId, date, fromDate, toDate);
+    const accumData = await this.getDailySales(tenantId, date, fromDate, toDate);
+    
+    const pdfContent: any[] = this.getPDFReportContent(accumData, 'Reporte de Ventas (Acumulado)');
+
+    if (fromDate && toDate && fromDate !== toDate) {
+      const days = getDaysArray(fromDate, toDate);
+      
+      const ordersByDay: Record<string, any[]> = {};
+      accumData.orders.forEach((o: any) => {
+        const dateStr = getLocalDate(new Date(o.paid_at));
+        if (!ordersByDay[dateStr]) {
+          ordersByDay[dateStr] = [];
+        }
+        ordersByDay[dateStr].push(o);
+      });
+
+      days.forEach((day) => {
+        const dayOrders = ordersByDay[day] || [];
+        if (dayOrders.length > 0) {
+          const dayData = this.calculateDailySalesFromOrders(dayOrders, day);
+          const dayContent = this.getPDFReportContent(dayData, `Reporte de Ventas (Día ${day})`);
+          
+          if (dayContent.length > 0) {
+            dayContent[0].pageBreak = 'before';
+          }
+          pdfContent.push(...dayContent);
+        }
+      });
+    }
 
     const docDefinition: TDocumentDefinitions = {
-      content: [
-        { text: 'SnackFlow - Reporte de Ventas', style: 'header' },
-        { text: `Período: ${data.rangeLabel}`, margin: [0, 10, 0, 20] },
-        {
-          table: {
-            widths: ['*', '*', '*'],
-            body: [
-              ['Concepto', 'Valor Actual', 'vs Período Anterior'],
-              ['Total de Ventas', `$${data.totalSales.toFixed(2)}`, data.comparison ? `$${data.comparison.prevTotalSales.toFixed(2)} (${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%)` : 'N/A'],
-              ['Cantidad de Tickets', data.ticketCount.toString(), data.comparison ? `${data.comparison.prevTicketCount} (${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%)` : 'N/A'],
-              ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`, data.comparison ? `$${data.comparison.prevAverageTicket.toFixed(2)} (${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%)` : 'N/A'],
-            ],
-          },
-        },
-        { text: '\nResumen por Método de Pago', style: 'subheader' },
-        {
-          table: {
-            widths: ['*', '*', '*'],
-            body: [
-              ['Método', 'Ventas', 'Tickets'],
-              ...Object.entries(data.byPaymentMethod || {}).map(([method, stats]: [string, any]) => {
-                const methodLabel = method === 'cash' ? 'EFECTIVO' :
-                                    method === 'card' ? 'TARJETA' :
-                                    method === 'transfer' ? 'TRANSFERENCIA' :
-                                    method === 'mixed' ? 'MIXTO' : method.toUpperCase();
-                return [
-                  methodLabel,
-                  `$${stats.total.toFixed(2)}`,
-                  stats.count.toString(),
-                ];
-              }),
-            ],
-          },
-        },
-      ],
+      content: pdfContent,
       styles: {
-        header: { fontSize: 18, bold: true },
-        subheader: { fontSize: 14, bold: true, margin: [0, 10, 0, 5] },
+        header: { fontSize: 16, bold: true },
+        subheader: { fontSize: 12, bold: true, margin: [0, 8, 0, 4] },
       },
     };
 
