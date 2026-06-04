@@ -308,25 +308,39 @@ export function ReportsPage() {
       {/* ── KPI Cards ───────────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <MetricCard
-          label="Ventas del Día"
+          label={dateFilter.from === dateFilter.to ? "Ventas del Día" : "Ventas del Período"}
           value={fmt(dailySales?.totalSales)}
           icon={<TrendingUp className="h-5 w-5" />}
           gradient="bg-gradient-to-br from-primary-500 via-primary-600 to-primary-700"
-          sub={hasData ? undefined : 'Sin ventas registradas'}
+          sub={dailySales?.comparison ? (
+            `${Number(dailySales.comparison.salesChange) >= 0 ? '📈 +' : '📉 '}${dailySales.comparison.salesChange}% vs período anterior (${fmt(dailySales.comparison.prevTotalSales)})`
+          ) : hasData ? undefined : 'Sin ventas registradas'}
         />
         <MetricCard
           label="Tickets"
           value={String(dailySales?.ticketCount ?? 0)}
           icon={<ShoppingCart className="h-5 w-5" />}
           gradient="bg-gradient-to-br from-violet-500 via-purple-600 to-purple-700"
+          sub={dailySales?.comparison ? (
+            `${Number(dailySales.comparison.ticketsChange) >= 0 ? '📈 +' : '📉 '}${dailySales.comparison.ticketsChange}% vs período anterior (${dailySales.comparison.prevTicketCount})`
+          ) : undefined}
         />
         <MetricCard
           label="Ticket Promedio"
           value={fmt(dailySales?.averageTicket)}
           icon={<Receipt className="h-5 w-5" />}
           gradient="bg-gradient-to-br from-blue-500 via-blue-600 to-indigo-700"
+          sub={dailySales?.comparison ? (
+            `${Number(dailySales.comparison.averageTicketChange) >= 0 ? '📈 +' : '📉 '}${dailySales.comparison.averageTicketChange}% vs período anterior (${fmt(dailySales.comparison.prevAverageTicket)})`
+          ) : undefined}
         />
       </div>
+
+      {dailySales?.comparison && (
+        <p className="text-xs text-gray-400 dark:text-gray-500 text-right no-print">
+          * Comparación realizada contra el período anterior: <span className="font-semibold">{dailySales.comparison.prevPeriodLabel}</span>
+        </p>
+      )}
 
       {/* ── No data banner ──────────────────────────────────────────────── */}
       {!hasData && (

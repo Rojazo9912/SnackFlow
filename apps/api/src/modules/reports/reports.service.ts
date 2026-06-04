@@ -55,33 +55,98 @@ export class ReportsService {
     let start: string;
     let end: string;
     let rangeLabel: string;
+    let currentDurationDays = 1;
+
+    let currentFromStr: string;
+    let currentToStr: string;
 
     if (fromDate && toDate) {
+      currentFromStr = fromDate;
+      currentToStr = toDate;
+      const from = new Date(`${fromDate}T12:00:00`);
+      const to = new Date(`${toDate}T12:00:00`);
+      const diffTime = Math.abs(to.getTime() - from.getTime());
+      currentDurationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+      
       start = getLocalDayBoundsUTC(fromDate).startOfDay;
       end = getLocalDayBoundsUTC(toDate).endOfDay;
       rangeLabel = fromDate === toDate ? fromDate : `${fromDate} al ${toDate}`;
     } else {
+      currentFromStr = targetDate;
+      currentToStr = targetDate;
+      currentDurationDays = 1;
       const bounds = getLocalDayBoundsUTC(targetDate);
       start = bounds.startOfDay;
       end = bounds.endOfDay;
       rangeLabel = targetDate;
     }
 
-    const { data: orders, error } = await this.supabase
-      .from('orders')
-      .select('id, total, payment_method, payment_details, paid_at')
-      .eq('tenant_id', tenantId)
-      .eq('status', 'paid')
-      .gte('paid_at', start)
-      .lt('paid_at', end);
+    // Calculate previous period dates
+    const fromDateObj = new Date(`${currentFromStr}T12:00:00`);
+    const toDateObj = new Date(`${currentToStr}T12:00:00`);
 
-    if (error) {
-      throw new Error(`Error obteniendo ventas: ${error.message}`);
+    const prevFromDate = new Date(fromDateObj);
+    prevFromDate.setDate(fromDateObj.getDate() - currentDurationDays);
+    const prevToDate = new Date(toDateObj);
+    prevToDate.setDate(toDateObj.getDate() - currentDurationDays);
+
+    const prevFromStr = prevFromDate.toISOString().split('T')[0];
+    const prevToStr = prevToDate.toISOString().split('T')[0];
+
+    const prevStart = getLocalDayBoundsUTC(prevFromStr).startOfDay;
+    const prevEnd = getLocalDayBoundsUTC(prevToStr).endOfDay;
+
+    const [currentResult, prevResult] = await Promise.all([
+      this.supabase
+        .from('orders')
+        .select('id, total, payment_method, payment_details, paid_at')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'paid')
+        .gte('paid_at', start)
+        .lt('paid_at', end),
+      this.supabase
+        .from('orders')
+        .select('id, total, paid_at')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'paid')
+        .gte('paid_at', prevStart)
+        .lt('paid_at', prevEnd)
+    ]);
+
+    if (currentResult.error) {
+      throw new Error(`Error obteniendo ventas del período actual: ${currentResult.error.message}`);
     }
+    if (prevResult.error) {
+      throw new Error(`Error obteniendo ventas del período anterior: ${prevResult.error.message}`);
+    }
+
+    const orders = currentResult.data;
+    const prevOrders = prevResult.data;
 
     const totalSales = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
     const ticketCount = orders?.length || 0;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
+
+    const prevTotalSales = prevOrders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
+    const prevTicketCount = prevOrders?.length || 0;
+    const prevAverageTicket = prevTicketCount > 0 ? prevTotalSales / prevTicketCount : 0;
+
+    // Helper to calculate percentage change
+    const calcPercentageChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? '100' : '0';
+      const change = ((current - previous) / previous) * 100;
+      return change.toFixed(1);
+    };
+
+    const comparison = {
+      prevTotalSales,
+      prevTicketCount,
+      prevAverageTicket: Math.round(prevAverageTicket * 100) / 100,
+      salesChange: calcPercentageChange(totalSales, prevTotalSales),
+      ticketsChange: calcPercentageChange(ticketCount, prevTicketCount),
+      averageTicketChange: calcPercentageChange(averageTicket, prevAverageTicket),
+      prevPeriodLabel: prevFromStr === prevToStr ? prevFromStr : `${prevFromStr} al ${prevToStr}`,
+    };
 
     // Group by payment method
     const byPaymentMethod = orders?.reduce(
@@ -139,6 +204,7 @@ export class ReportsService {
       ticketCount,
       averageTicket: Math.round(averageTicket * 100) / 100,
       byPaymentMethod,
+      comparison,
     };
   }
 
@@ -432,8 +498,20 @@ export class ReportsService {
 
     worksheet.addRow({ label: 'Fecha / Período', value: data.rangeLabel });
     worksheet.addRow({ label: 'Total de Ventas', value: data.totalSales });
+    if (data.comparison) {
+      worksheet.addRow({ label: '  Ventas Período Anterior', value: data.comparison.prevTotalSales });
+      worksheet.addRow({ label: '  Diferencia Ventas %', value: `${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%` });
+    }
     worksheet.addRow({ label: 'Cantidad de Tickets', value: data.ticketCount });
+    if (data.comparison) {
+      worksheet.addRow({ label: '  Tickets Período Anterior', value: data.comparison.prevTicketCount });
+      worksheet.addRow({ label: '  Diferencia Tickets %', value: `${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%` });
+    }
     worksheet.addRow({ label: 'Ticket Promedio', value: data.averageTicket });
+    if (data.comparison) {
+      worksheet.addRow({ label: '  Ticket Prom. Per. Anterior', value: data.comparison.prevAverageTicket });
+      worksheet.addRow({ label: '  Diferencia Promedio %', value: `${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%` });
+    }
     worksheet.addRow({});
     worksheet.addRow({ label: 'Ventas por Método de Pago' }).font = { bold: true };
 
@@ -460,12 +538,12 @@ export class ReportsService {
         { text: `Período: ${data.rangeLabel}`, margin: [0, 10, 0, 20] },
         {
           table: {
-            widths: ['*', '*'],
+            widths: ['*', '*', '*'],
             body: [
-              ['Concepto', 'Valor'],
-              ['Total de Ventas', `$${data.totalSales.toFixed(2)}`],
-              ['Cantidad de Tickets', data.ticketCount.toString()],
-              ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`],
+              ['Concepto', 'Valor Actual', 'vs Período Anterior'],
+              ['Total de Ventas', `$${data.totalSales.toFixed(2)}`, data.comparison ? `$${data.comparison.prevTotalSales.toFixed(2)} (${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%)` : 'N/A'],
+              ['Cantidad de Tickets', data.ticketCount.toString(), data.comparison ? `${data.comparison.prevTicketCount} (${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%)` : 'N/A'],
+              ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`, data.comparison ? `$${data.comparison.prevAverageTicket.toFixed(2)} (${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%)` : 'N/A'],
             ],
           },
         },
