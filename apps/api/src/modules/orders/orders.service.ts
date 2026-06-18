@@ -47,6 +47,7 @@ export class OrdersService {
           id,
           quantity,
           unit_price,
+          unit_cost,
           subtotal,
           notes,
           product:products(id, name, code)
@@ -102,6 +103,7 @@ export class OrdersService {
           id,
           quantity,
           unit_price,
+          unit_cost,
           subtotal,
           notes,
           product:products(id, name, code, price)
@@ -122,12 +124,14 @@ export class OrdersService {
   async create(tenantId: string, userId: string, createOrderDto: CreateOrderDto) {
     // Calculate totals
     let subtotal = 0;
+    let totalIva = 0;
+    let totalIeps = 0;
     const itemsWithPrices = [];
 
     for (const item of createOrderDto.items) {
       const { data: product } = await this.supabase
         .from('products')
-        .select('id, price, name')
+        .select('id, price, name, cost, tax_iva, tax_ieps')
         .eq('id', item.productId)
         .eq('tenant_id', tenantId)
         .single();
@@ -141,12 +145,25 @@ export class OrdersService {
       const itemSubtotal = product.price * item.quantity;
       subtotal += itemSubtotal;
 
+      const taxIvaPct = product.tax_iva ?? 0;
+      const taxIepsPct = product.tax_ieps ?? 0;
+      const totalTaxFactor = 1 + (taxIvaPct / 100) + (taxIepsPct / 100);
+      const basePrice = product.price / totalTaxFactor;
+      const itemIva = basePrice * (taxIvaPct / 100) * item.quantity;
+      const itemIeps = basePrice * (taxIepsPct / 100) * item.quantity;
+
+      totalIva += itemIva;
+      totalIeps += itemIeps;
+
       itemsWithPrices.push({
         product_id: item.productId,
         quantity: item.quantity,
         unit_price: product.price,
+        unit_cost: product.cost || 0,
         subtotal: itemSubtotal,
         notes: item.notes,
+        item_iva: Math.round(itemIva * 100) / 100,
+        item_ieps: Math.round(itemIeps * 100) / 100,
       });
     }
 
@@ -159,6 +176,8 @@ export class OrdersService {
         status: OrderStatus.PENDING,
         subtotal,
         total: subtotal,
+        total_iva: Math.round(totalIva * 100) / 100,
+        total_ieps: Math.round(totalIeps * 100) / 100,
         notes: createOrderDto.notes,
       })
       .select()
@@ -217,6 +236,7 @@ export class OrdersService {
 
     if (updateStatusDto.status === OrderStatus.IN_CASHIER) {
       updateData.cashier_id = userId;
+      updateData.checkout_started_at = new Date().toISOString();
     }
 
     if (updateStatusDto.status === OrderStatus.CANCELLED) {

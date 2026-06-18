@@ -309,7 +309,7 @@ export function ReportsPage() {
       />
 
       {/* ── KPI Cards ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           label={dateFilter.from === dateFilter.to ? "Ventas del Día" : "Ventas del Período"}
           value={fmt(dailySales?.totalSales)}
@@ -318,6 +318,13 @@ export function ReportsPage() {
           sub={dailySales?.comparison ? (
             `${Number(dailySales.comparison.salesChange) >= 0 ? '📈 +' : '📉 '}${dailySales.comparison.salesChange}% vs período anterior (${fmt(dailySales.comparison.prevTotalSales)})`
           ) : hasData ? undefined : 'Sin ventas registradas'}
+        />
+        <MetricCard
+          label="Utilidad Bruta"
+          value={fmt(dailySales?.totalProfit)}
+          icon={<Receipt className="h-5 w-5" />}
+          gradient="bg-gradient-to-br from-emerald-500 via-emerald-600 to-teal-700"
+          sub={hasData ? `Margen: ${dailySales?.profitMargin ?? 0}%` : undefined}
         />
         <MetricCard
           label="Tickets"
@@ -403,6 +410,29 @@ export function ReportsPage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+      )}
+
+      {/* ── Fiscal taxes breakdown ────────────────────────────────────────── */}
+      {hasData && (
+        <div className="rounded-2xl bg-white p-6 shadow-sm ring-1 ring-gray-100 dark:bg-gray-800 dark:ring-gray-700">
+          <h2 className="mb-2 flex items-center gap-2 text-base font-semibold text-gray-900 dark:text-white">
+            <Receipt className="h-4 w-4 text-emerald-500" />
+            Desglose de Impuestos Recaudados (SAT)
+          </h2>
+          <p className="mb-4 text-xs text-gray-400 dark:text-gray-500">
+            Resumen impositivo calculado de forma automática para declaraciones fiscales mensuales
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="p-4 bg-emerald-50/50 dark:bg-emerald-950/10 rounded-xl border border-emerald-100/30">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mb-1">IVA Trasladado (16%)</p>
+              <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{fmt(dailySales?.totalIva)}</p>
+            </div>
+            <div className="p-4 bg-amber-50/50 dark:bg-amber-950/10 rounded-xl border border-amber-100/30">
+              <p className="text-xs text-gray-500 dark:text-gray-400 font-bold uppercase tracking-wider mb-1">IEPS Recaudado (8%)</p>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">{fmt(dailySales?.totalIeps)}</p>
+            </div>
           </div>
         </div>
       )}

@@ -77,7 +77,7 @@ export class InventoryService {
     // Get current stock
     const { data: product, error: productError } = await this.supabase
       .from('products')
-      .select('id, stock, name')
+      .select('id, stock, name, cost')
       .eq('id', adjustDto.productId)
       .eq('tenant_id', tenantId)
       .single();
@@ -119,7 +119,7 @@ export class InventoryService {
       throw new Error(`Error actualizando stock: ${updateError.message}`);
     }
 
-    // Create movement record
+    // Create movement record (unit_cost_at_time congela el costo vigente para valuación de merma)
     const { data: movement, error: movementError } = await this.supabase
       .from('inventory_movements')
       .insert({
@@ -131,6 +131,7 @@ export class InventoryService {
         previous_stock: previousStock,
         new_stock: newStock,
         reason: adjustDto.reason,
+        unit_cost_at_time: product.cost || 0,
       })
       .select()
       .single();
@@ -143,6 +144,29 @@ export class InventoryService {
       ...movement,
       product: { id: product.id, name: product.name },
     };
+  }
+
+  async getWasteSummary(tenantId: string, fromDate?: string, toDate?: string) {
+    let query = this.supabase
+      .from('inventory_movements')
+      .select(`
+        id, quantity, unit_cost_at_time, total_cost_impact, reason, created_at,
+        product:products(id, name, code)
+      `)
+      .eq('tenant_id', tenantId)
+      .eq('type', MovementType.WASTE)
+      .order('created_at', { ascending: false });
+
+    if (fromDate) query = query.gte('created_at', fromDate);
+    if (toDate)   query = query.lte('created_at', toDate);
+
+    const { data, error } = await query;
+    if (error) throw new Error(`Error obteniendo merma: ${error.message}`);
+
+    const totalUnits = data?.reduce((s, m) => s + (m.quantity || 0), 0) || 0;
+    const totalCost  = data?.reduce((s, m) => s + (Number(m.total_cost_impact) || 0), 0) || 0;
+
+    return { movements: data || [], totalUnits, totalCost };
   }
 
   async getLowStockProducts(tenantId: string) {

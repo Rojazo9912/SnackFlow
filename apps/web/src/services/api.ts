@@ -349,6 +349,10 @@ export const cashRegisterApi = {
     api.post<any>('/cash-register/movement', { type, amount, reason }),
   getMovements: () => api.get<any[]>('/cash-register/movements'),
   getHistory: (limit = 10) => api.get<any[]>(`/cash-register/history?limit=${limit}`),
+  submitBlindCount: (denominations: { denomination: number; quantity: number }[]) =>
+    api.post<any>('/cash-register/blind-count', { denominations }),
+  closeBlind: (closeNotes?: string, supervisorPin?: string) =>
+    api.post<any>('/cash-register/close-blind', { closeNotes, supervisorPin }),
 };
 
 // Inventory
@@ -364,6 +368,41 @@ export const inventoryApi = {
   adjustStock: (productId: string, type: 'in' | 'out' | 'waste', quantity: number, reason: string) =>
     api.post<any>('/inventory/adjust', { productId, type, quantity, reason }),
   getLowStock: () => api.get<any[]>('/inventory/low-stock'),
+  getWasteSummary: (fromDate?: string, toDate?: string) => {
+    const searchParams = new URLSearchParams();
+    if (fromDate) searchParams.set('fromDate', fromDate);
+    if (toDate) searchParams.set('toDate', toDate);
+    const query = searchParams.toString();
+    return api.get<any>(`/inventory/waste-summary${query ? `?${query}` : ''}`);
+  },
+};
+
+// Shifts
+export const shiftsApi = {
+  clockIn: () => api.post<any>('/shifts/clock-in'),
+  clockOut: (notes?: string) => api.post<any>('/shifts/clock-out', { notes }),
+  getMyShift: () => api.get<any>('/shifts/my-shift'),
+  getActive: () => api.get<any[]>('/shifts/active'),
+  getHistory: (params?: { fromDate?: string; toDate?: string; userId?: string }) => {
+    const searchParams = new URLSearchParams();
+    if (params?.fromDate) searchParams.set('fromDate', params.fromDate);
+    if (params?.toDate) searchParams.set('toDate', params.toDate);
+    if (params?.userId) searchParams.set('userId', params.userId);
+    const query = searchParams.toString();
+    return api.get<any[]>(`/shifts/history${query ? `?${query}` : ''}`);
+  },
+};
+
+// Supervisor Auth
+export const supervisorAuthApi = {
+  authorize: (data: {
+    supervisorPin: string;
+    actionType: string;
+    referenceId?: string;
+    referenceTable?: string;
+    metadata?: Record<string, any>;
+  }) => api.post<any>('/supervisor-auth/authorize', data),
+  getHistory: () => api.get<any[]>('/supervisor-auth/history'),
 };
 
 // Reports

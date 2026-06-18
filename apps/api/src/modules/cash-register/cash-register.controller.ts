@@ -4,6 +4,7 @@ import { CashRegisterService } from './cash-register.service';
 import { OpenCashDto } from './dto/open-cash.dto';
 import { CloseCashDto } from './dto/close-cash.dto';
 import { CashMovementDto } from './dto/cash-movement.dto';
+import { BlindCountDto, CloseBlindDto } from './dto/blind-count.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles, Role } from '../../common/decorators/roles.decorator';
@@ -62,6 +63,26 @@ export class CashRegisterController {
   @ApiOperation({ summary: 'Obtener movimientos de la sesion actual' })
   async getSessionMovements(@CurrentUser('tenantId') tenantId: string) {
     return this.cashRegisterService.getSessionMovements(tenantId);
+  }
+
+  @Post('blind-count')
+  @Roles(Role.CASHIER, Role.ADMIN, Role.SUPERVISOR)
+  @ApiOperation({ summary: 'Registrar conteo físico de denominaciones (arqueo ciego)' })
+  async submitBlindCount(
+    @CurrentUser('tenantId') tenantId: string,
+    @Body() blindCountDto: BlindCountDto,
+  ) {
+    return this.cashRegisterService.submitBlindCount(tenantId, blindCountDto);
+  }
+
+  @Post('close-blind')
+  @Roles(Role.CASHIER, Role.ADMIN, Role.SUPERVISOR)
+  @ApiOperation({ summary: 'Cerrar caja con resultado del arqueo ciego' })
+  async closeSessionBlind(
+    @CurrentUser() user: CurrentUserData,
+    @Body() closeDto: CloseBlindDto,
+  ) {
+    return this.cashRegisterService.closeSessionBlind(user.tenantId, user.id, closeDto);
   }
 
   @Get('history')

@@ -15,6 +15,8 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { HealthModule } from './modules/health/health.module';
 import { FilesModule } from './modules/files/files.module';
 import { AttributesModule } from './modules/attributes/attributes.module';
+import { ShiftsModule } from './modules/shifts/shifts.module';
+import { SupervisorAuthModule } from './modules/supervisor-auth/supervisor-auth.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { AttributesModule } from './modules/attributes/attributes.module';
     CashRegisterModule,
     ReportsModule,
     FilesModule,
+    ShiftsModule,
+    SupervisorAuthModule,
   ],
   providers: [
     {

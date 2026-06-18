@@ -72,6 +72,7 @@ export function DashboardPage() {
   }
 
   const percentChange = parseFloat(kpis?.percentChange?.replace('%', '') || '0');
+  const trendValues = salesTrend.map((d) => d.total);
 
   return (
     <div className="space-y-6">
@@ -99,12 +100,16 @@ export function DashboardPage() {
           change={percentChange}
           changeLabel="vs ayer"
           icon={<DollarSign className="w-6 h-6 text-primary-600" />}
+          sparkData={trendValues}
+          sparkColor="#f59e0b"
         />
         <KPICard
           title="Ticket Promedio"
           value={kpis?.averageTicket || 0}
           format="currency"
           icon={<TrendingUp className="w-6 h-6 text-purple-600" />}
+          sparkData={trendValues}
+          sparkColor="#a78bfa"
         />
         <KPICard
           title="Pedidos Pendientes"
@@ -125,32 +130,32 @@ export function DashboardPage() {
       </div>
 
       {/* Additional Info */}
-      <div className="bg-white dark:bg-gray-800 rounded-2xl p-6 shadow-sm ring-1 ring-gray-100 dark:ring-gray-700">
-        <div className="flex items-center gap-3 mb-4">
-          <div className="rounded-xl bg-gray-100 dark:bg-gray-700 p-2">
-            <Package className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+      <div className="premium-glass-card rounded-2xl p-6 border border-white/40 dark:border-gray-750/30">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="rounded-xl bg-gradient-to-tr from-amber-400 to-orange-500 p-2 shadow-md shadow-amber-500/10">
+            <Package className="w-4 h-4 text-white" />
           </div>
-          <h3 className="text-base font-semibold text-gray-900 dark:text-white">
-            Información Adicional
+          <h3 className="text-base font-bold text-gray-900 dark:text-white tracking-tight">
+            Resumen Operativo Adicional
           </h3>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Ventas de Ayer</p>
-            <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
-              ${(kpis?.yesterdaySales || 0).toFixed(2)}
+          <div className="p-4 bg-white dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5 font-bold uppercase tracking-wider">Ventas de Ayer</p>
+            <p className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              ${(kpis?.yesterdaySales || 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Cambio vs Ayer</p>
-            <p className={`text-2xl font-extrabold ${percentChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
-              {percentChange >= 0 ? '+' : ''}{percentChange.toFixed(1)}%
+          <div className="p-4 bg-white dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5 font-bold uppercase tracking-wider">Desviación vs Ayer</p>
+            <p className={`text-2xl font-extrabold tracking-tight ${percentChange >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+              {percentChange >= 0 ? '📈 +' : '📉 '}{percentChange.toFixed(1)}%
             </p>
           </div>
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-100 dark:border-gray-700">
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1 font-medium uppercase tracking-wide">Última Actualización</p>
-            <p className="text-2xl font-extrabold text-gray-900 dark:text-white">
-              {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}
+          <div className="p-4 bg-white dark:bg-gray-900/40 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm">
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5 font-bold uppercase tracking-wider">Última Sincronización</p>
+            <p className="text-2xl font-extrabold text-gray-900 dark:text-white tracking-tight">
+              {new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
           </div>
         </div>

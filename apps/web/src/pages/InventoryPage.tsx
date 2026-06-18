@@ -25,6 +25,36 @@ interface Movement {
   user: { id: string; name: string };
 }
 
+function StockThermometer({ stock, minStock }: { stock: number; minStock: number }) {
+  const pct = Math.min(100, Math.max(0, ((stock ?? 0) / (minStock || 1)) * 100));
+
+  const zone =
+    pct === 0
+      ? { label: 'Agotado', bar: 'bg-gradient-to-r from-red-500 to-rose-600 animate-pulse', text: 'text-red-600' }
+      : pct < 10
+      ? { label: 'Crítico', bar: 'bg-gradient-to-r from-red-500 to-rose-600 animate-pulse', text: 'text-red-600' }
+      : pct < 50
+      ? { label: 'Bajo', bar: 'bg-gradient-to-r from-orange-400 to-amber-500', text: 'text-orange-500' }
+      : pct < 100
+      ? { label: 'Precaución', bar: 'bg-gradient-to-r from-yellow-400 to-amber-400', text: 'text-yellow-500' }
+      : { label: 'OK', bar: 'bg-gradient-to-r from-emerald-400 to-green-500', text: 'text-emerald-600' };
+
+  return (
+    <>
+      <div className="w-full h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all duration-1000 ${zone.bar}`}
+          style={{ width: `${Math.max(pct, 3)}%` }}
+        />
+      </div>
+      <div className="flex justify-between items-center mt-1.5 text-[10px] font-bold uppercase tracking-wide">
+        <span className={zone.text}>{zone.label}</span>
+        <span className="text-gray-400">{Math.round(pct)}% del mínimo</span>
+      </div>
+    </>
+  );
+}
+
 export function InventoryPage() {
   const [lowStock, setLowStock] = useState<LowStockProduct[]>([]);
   const [movements, setMovements] = useState<Movement[]>([]);
@@ -122,34 +152,80 @@ export function InventoryPage() {
 
       {/* Low stock alert */}
       {lowStock.length > 0 && (
-        <div className="card border-l-4 border-red-500">
-          <div className="flex items-center gap-2 mb-3">
-            <AlertTriangle className="w-5 h-5 text-red-500" />
-            <h2 className="font-semibold text-red-700">
-              Productos con Stock Bajo ({lowStock.length})
+        <div className="premium-glass-card rounded-2xl border border-red-200 dark:border-red-900/30 p-5 shadow-md shadow-red-500/5">
+          <div className="flex items-center gap-2.5 mb-4">
+            <div className="p-2 rounded-xl bg-red-500 text-white shadow shadow-red-500/25 animate-pulse">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <h2 className="font-extrabold text-red-700 dark:text-red-400 tracking-tight">
+              Alerta de Abastecimiento: Stock Bajo ({lowStock.length})
             </h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            {lowStock.map((product) => (
-              <div
-                key={product.id}
-                className="flex justify-between items-center p-3 bg-red-50 rounded-lg"
-              >
-                <div>
-                  <p className="font-medium">{product.name}</p>
-                  <p className="text-sm text-gray-500">{product.code}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {lowStock.map((product) => {
+              const isCrit = product.stock === 0;
+
+              return (
+                <div
+                  key={product.id}
+                  className="flex flex-col p-4 bg-white dark:bg-gray-950 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm transition-all duration-300 hover:shadow-md relative overflow-hidden group"
+                >
+                  <div className="flex justify-between items-start mb-3">
+                    <div>
+                      <p className="font-bold text-gray-900 dark:text-white group-hover:text-amber-600 transition-colors">{product.name}</p>
+                      <p className="text-xs text-gray-400 font-semibold tracking-wider font-mono">{product.code}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-lg font-black ${isCrit ? 'text-red-600 animate-pulse' : 'text-amber-500'}`}>
+                        {product.stock}
+                      </p>
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wide">
+                        Mínimo: {product.min_stock}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Stock Thermometer — 4 zonas */}
+                  <StockThermometer stock={product.stock} minStock={product.min_stock} />
                 </div>
-                <div className="text-right">
-                  <p className="font-bold text-red-600">{product.stock}</p>
-                  <p className="text-xs text-gray-500">
-                    Min: {product.min_stock}
-                  </p>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
+      {/* ── Valuation Grid ─────────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="premium-glass-card rounded-2xl p-5 border border-white/40 dark:border-gray-800/40 shadow-sm relative overflow-hidden group">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+            Valor de Almacén (A Costo)
+          </p>
+          <p className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">
+            ${products.reduce((sum, p) => sum + (p.stock || 0) * (p.cost || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1 font-bold uppercase tracking-wide"> Capital Real Invertido </p>
+        </div>
+        <div className="premium-glass-card rounded-2xl p-5 border border-white/40 dark:border-gray-800/40 shadow-sm relative overflow-hidden group">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+            Valor Comercial (A Venta)
+          </p>
+          <p className="text-2xl font-black text-amber-600 dark:text-amber-400 tracking-tight">
+            ${products.reduce((sum, p) => sum + (p.stock || 0) * (p.price || 0), 0).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1 font-bold uppercase tracking-wide"> Retorno Estimado Ventas </p>
+        </div>
+        <div className="premium-glass-card rounded-2xl p-5 border border-white/40 dark:border-gray-800/40 shadow-sm relative overflow-hidden group">
+          <p className="text-xs font-bold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-1.5">
+            Utilidad Proyectada
+          </p>
+          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 tracking-tight">
+            ${(
+              products.reduce((sum, p) => sum + (p.stock || 0) * (p.price || 0), 0) -
+              products.reduce((sum, p) => sum + (p.stock || 0) * (p.cost || 0), 0)
+            ).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
+          <p className="text-[10px] text-gray-400 mt-1 font-bold uppercase tracking-wide"> Ganancia potencial bruta </p>
+        </div>
+      </div>
 
       {/* Recent movements */}
       <div className="card">

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Param, Body, Query, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Param, Body, Query, UseGuards, ParseIntPipe, Optional } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { InventoryService, MovementType } from './inventory.service';
 import { AdjustStockDto } from './dto/adjust-stock.dto';
@@ -54,6 +54,19 @@ export class InventoryController {
   @ApiOperation({ summary: 'Listar productos con stock bajo' })
   async getLowStock(@CurrentUser('tenantId') tenantId: string) {
     return this.inventoryService.getLowStockProducts(tenantId);
+  }
+
+  @Get('waste-summary')
+  @Roles(Role.ADMIN, Role.SUPERVISOR)
+  @ApiOperation({ summary: 'Resumen financiero de merma' })
+  @ApiQuery({ name: 'fromDate', required: false })
+  @ApiQuery({ name: 'toDate', required: false })
+  async getWasteSummary(
+    @CurrentUser('tenantId') tenantId: string,
+    @Query('fromDate') fromDate?: string,
+    @Query('toDate') toDate?: string,
+  ) {
+    return this.inventoryService.getWasteSummary(tenantId, fromDate, toDate);
   }
 
   @Post('adjust')
