@@ -111,7 +111,7 @@ export class ReportsService {
     const [currentResult, prevResult] = await Promise.all([
       this.supabase
         .from('orders')
-        .select('id, total, payment_method, payment_details, paid_at')
+        .select('id, total, payment_method, payment_details, paid_at, total_iva, total_ieps, order_items(quantity, unit_cost)')
         .eq('tenant_id', tenantId)
         .eq('status', 'paid')
         .gte('paid_at', start)
@@ -138,6 +138,20 @@ export class ReportsService {
     const totalSales = orders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
     const ticketCount = orders?.length || 0;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
+
+    const totalIva = orders?.reduce((sum, o) => sum + (Number(o.total_iva) || 0), 0) || 0;
+    const totalIeps = orders?.reduce((sum, o) => sum + (Number(o.total_ieps) || 0), 0) || 0;
+
+    let totalCogs = 0;
+    orders?.forEach((o) => {
+      const items = (o.order_items || []) as any[];
+      items.forEach((item) => {
+        totalCogs += (item.quantity || 0) * (Number(item.unit_cost) || 0);
+      });
+    });
+
+    const totalProfit = totalSales - totalCogs;
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
 
     const prevTotalSales = prevOrders?.reduce((sum, o) => sum + (o.total || 0), 0) || 0;
     const prevTicketCount = prevOrders?.length || 0;
@@ -215,6 +229,11 @@ export class ReportsService {
       totalSales,
       ticketCount,
       averageTicket: Math.round(averageTicket * 100) / 100,
+      totalCogs,
+      totalProfit,
+      profitMargin: Math.round(profitMargin * 100) / 100,
+      totalIva: Math.round(totalIva * 100) / 100,
+      totalIeps: Math.round(totalIeps * 100) / 100,
       byPaymentMethod,
       comparison,
       orders: orders || [],
@@ -503,6 +522,20 @@ export class ReportsService {
     const ticketCount = orders?.length || 0;
     const averageTicket = ticketCount > 0 ? totalSales / ticketCount : 0;
 
+    const totalIva = orders?.reduce((sum, o) => sum + (Number(o.total_iva) || 0), 0) || 0;
+    const totalIeps = orders?.reduce((sum, o) => sum + (Number(o.total_ieps) || 0), 0) || 0;
+
+    let totalCogs = 0;
+    orders?.forEach((o) => {
+      const items = (o.order_items || []) as any[];
+      items.forEach((item) => {
+        totalCogs += (item.quantity || 0) * (Number(item.unit_cost) || 0);
+      });
+    });
+
+    const totalProfit = totalSales - totalCogs;
+    const profitMargin = totalSales > 0 ? (totalProfit / totalSales) * 100 : 0;
+
     // Group by payment method
     const byPaymentMethod = orders?.reduce(
       (acc, o) => {
@@ -558,6 +591,11 @@ export class ReportsService {
       totalSales,
       ticketCount,
       averageTicket: Math.round(averageTicket * 100) / 100,
+      totalCogs,
+      totalProfit,
+      profitMargin: Math.round(profitMargin * 100) / 100,
+      totalIva: Math.round(totalIva * 100) / 100,
+      totalIeps: Math.round(totalIeps * 100) / 100,
       byPaymentMethod,
       comparison: null,
     };
@@ -565,32 +603,54 @@ export class ReportsService {
 
   private populateWorksheet(worksheet: ExcelJS.Worksheet, data: any, title: string) {
     worksheet.columns = [
-      { header: 'Concepto', key: 'label', width: 30 },
+      { header: 'Concepto', key: 'label', width: 32 },
       { header: 'Valor', key: 'value', width: 30 },
     ];
 
     const titleRow = worksheet.addRow({ label: title, value: '' });
     titleRow.font = { bold: true, size: 12 };
-    
+
     worksheet.addRow({ label: 'Fecha / Período', value: data.rangeLabel });
+    worksheet.addRow({});
+
+    // Ventas y comparativa
+    const salesHeader = worksheet.addRow({ label: '— Ventas', value: '' });
+    salesHeader.font = { bold: true };
     worksheet.addRow({ label: 'Total de Ventas', value: data.totalSales });
     if (data.comparison) {
       worksheet.addRow({ label: '  Ventas Período Anterior', value: data.comparison.prevTotalSales });
-      worksheet.addRow({ label: '  Diferencia Ventas %', value: `${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%` });
+      worksheet.addRow({ label: '  Variación %', value: `${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%` });
     }
     worksheet.addRow({ label: 'Cantidad de Tickets', value: data.ticketCount });
     if (data.comparison) {
       worksheet.addRow({ label: '  Tickets Período Anterior', value: data.comparison.prevTicketCount });
-      worksheet.addRow({ label: '  Diferencia Tickets %', value: `${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%` });
+      worksheet.addRow({ label: '  Variación %', value: `${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%` });
     }
     worksheet.addRow({ label: 'Ticket Promedio', value: data.averageTicket });
     if (data.comparison) {
       worksheet.addRow({ label: '  Ticket Prom. Per. Anterior', value: data.comparison.prevAverageTicket });
-      worksheet.addRow({ label: '  Diferencia Promedio %', value: `${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%` });
+      worksheet.addRow({ label: '  Variación %', value: `${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%` });
     }
-    worksheet.addRow({});
-    worksheet.addRow({ label: 'Ventas por Método de Pago' }).font = { bold: true };
 
+    // Rentabilidad
+    worksheet.addRow({});
+    const profitHeader = worksheet.addRow({ label: '— Rentabilidad', value: '' });
+    profitHeader.font = { bold: true };
+    worksheet.addRow({ label: 'Costo de lo Vendido (COGS)', value: data.totalCogs ?? 0 });
+    worksheet.addRow({ label: 'Utilidad Bruta', value: data.totalProfit ?? 0 });
+    worksheet.addRow({ label: 'Margen de Utilidad %', value: `${data.profitMargin ?? 0}%` });
+
+    // Fiscal SAT
+    worksheet.addRow({});
+    const taxHeader = worksheet.addRow({ label: '— Impuestos SAT', value: '' });
+    taxHeader.font = { bold: true };
+    worksheet.addRow({ label: 'IVA Trasladado (16%)', value: data.totalIva ?? 0 });
+    worksheet.addRow({ label: 'IEPS Recaudado (8%)', value: data.totalIeps ?? 0 });
+
+    // Métodos de pago
+    worksheet.addRow({});
+    const payHeader = worksheet.addRow({ label: '— Ventas por Método de Pago', value: '' });
+    payHeader.font = { bold: true };
     Object.entries(data.byPaymentMethod || {}).forEach(([method, stats]: [string, any]) => {
       const methodLabel = method === 'cash' ? 'EFECTIVO' :
                           method === 'card' ? 'TARJETA' :
@@ -604,25 +664,51 @@ export class ReportsService {
   }
 
   private getPDFReportContent(data: any, title: string): any[] {
-    const tableBody = [
-      ['Concepto', 'Valor Actual', 'vs Período Anterior'],
-      ['Total de Ventas', `$${data.totalSales.toFixed(2)}`, data.comparison ? `$${data.comparison.prevTotalSales.toFixed(2)} (${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%)` : 'N/A'],
-      ['Cantidad de Tickets', data.ticketCount.toString(), data.comparison ? `${data.comparison.prevTicketCount} (${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%)` : 'N/A'],
-      ['Ticket Promedio', `$${data.averageTicket.toFixed(2)}`, data.comparison ? `$${data.comparison.prevAverageTicket.toFixed(2)} (${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%)` : 'N/A'],
+    const hasComparison = !!data.comparison;
+    const salesBody = [
+      hasComparison
+        ? ['Concepto', 'Valor Actual', 'vs Período Anterior']
+        : ['Concepto', 'Valor'],
+      [
+        'Total de Ventas',
+        `$${data.totalSales.toFixed(2)}`,
+        ...(hasComparison ? [`$${data.comparison.prevTotalSales.toFixed(2)} (${Number(data.comparison.salesChange) >= 0 ? '+' : ''}${data.comparison.salesChange}%)`] : []),
+      ],
+      [
+        'Cantidad de Tickets',
+        data.ticketCount.toString(),
+        ...(hasComparison ? [`${data.comparison.prevTicketCount} (${Number(data.comparison.ticketsChange) >= 0 ? '+' : ''}${data.comparison.ticketsChange}%)`] : []),
+      ],
+      [
+        'Ticket Promedio',
+        `$${data.averageTicket.toFixed(2)}`,
+        ...(hasComparison ? [`$${data.comparison.prevAverageTicket.toFixed(2)} (${Number(data.comparison.averageTicketChange) >= 0 ? '+' : ''}${data.comparison.averageTicketChange}%)`] : []),
+      ],
     ];
 
-    if (!data.comparison) {
-      tableBody.forEach(row => row.pop());
-      tableBody[0][1] = 'Valor';
-    }
+    const profitBody = [
+      ['Concepto', 'Valor'],
+      ['Costo de lo Vendido (COGS)', `$${(data.totalCogs ?? 0).toFixed(2)}`],
+      ['Utilidad Bruta', `$${(data.totalProfit ?? 0).toFixed(2)}`],
+      ['Margen de Utilidad', `${data.profitMargin ?? 0}%`],
+      ['IVA Trasladado (16%)', `$${(data.totalIva ?? 0).toFixed(2)}`],
+      ['IEPS Recaudado (8%)', `$${(data.totalIeps ?? 0).toFixed(2)}`],
+    ];
 
     return [
       { text: `SnackFlow - ${title}`, style: 'header' },
       { text: `Período / Fecha: ${data.rangeLabel}`, margin: [0, 5, 0, 15] },
       {
         table: {
-          widths: data.comparison ? ['*', '*', '*'] : ['*', '*'],
-          body: tableBody,
+          widths: hasComparison ? ['*', '*', '*'] : ['*', '*'],
+          body: salesBody,
+        },
+      },
+      { text: '\nRentabilidad e Impuestos SAT', style: 'subheader' },
+      {
+        table: {
+          widths: ['*', '*'],
+          body: profitBody,
         },
       },
       { text: '\nResumen por Método de Pago', style: 'subheader' },
@@ -636,11 +722,7 @@ export class ReportsService {
                                   method === 'card' ? 'TARJETA' :
                                   method === 'transfer' ? 'TRANSFERENCIA' :
                                   method === 'mixed' ? 'MIXTO' : method.toUpperCase();
-              return [
-                methodLabel,
-                `$${stats.total.toFixed(2)}`,
-                stats.count.toString(),
-              ];
+              return [methodLabel, `$${stats.total.toFixed(2)}`, stats.count.toString()];
             }),
           ],
         },

@@ -9,6 +9,9 @@ import { SUPABASE_CLIENT } from '../../database/database.module';
 import { OpenCashDto } from './dto/open-cash.dto';
 import { CloseCashDto } from './dto/close-cash.dto';
 import { CashMovementDto } from './dto/cash-movement.dto';
+import { BlindCountDto, CloseBlindDto, DenominationDto } from './dto/blind-count.dto';
+
+const BLIND_COUNT_TOLERANCE_MXN = 50;
 
 export enum CashSessionStatus {
   OPEN = 'open',
@@ -214,6 +217,131 @@ export class CashRegisterService {
     }
 
     return data;
+  }
+
+  // ── Arqueo Ciego ─────────────────────────────────────────────────
+
+  async submitBlindCount(tenantId: string, blindCountDto: BlindCountDto) {
+    const session = await this.getCurrentSession(tenantId);
+    if (!session) throw new BadRequestException('No hay caja abierta.');
+
+    // Eliminar conteo previo si existe (el cajero puede rehacer el conteo)
+    await this.supabase
+      .from('cash_blind_count_detail')
+      .delete()
+      .eq('session_id', session.id);
+
+    // Insertar denominaciones
+    const details = blindCountDto.denominations.map((d: DenominationDto) => ({
+      session_id: session.id,
+      denomination: d.denomination,
+      quantity: d.quantity,
+    }));
+
+    if (details.length > 0) {
+      const { error } = await this.supabase
+        .from('cash_blind_count_detail')
+        .insert(details);
+      if (error) throw new Error(`Error guardando conteo: ${error.message}`);
+    }
+
+    const blindTotal = blindCountDto.denominations.reduce(
+      (sum, d) => sum + d.denomination * d.quantity,
+      0,
+    );
+
+    // Guardar el total del conteo ciego (sin mostrar el esperado al cajero)
+    await this.supabase
+      .from('cash_sessions')
+      .update({ blind_count: blindTotal })
+      .eq('id', session.id);
+
+    return {
+      sessionId: session.id,
+      blindTotal: Math.round(blindTotal * 100) / 100,
+      message: 'Conteo registrado. Confirma el cierre para ver el resultado.',
+    };
+  }
+
+  async closeSessionBlind(tenantId: string, userId: string, closeDto: CloseBlindDto) {
+    const session = await this.getCurrentSession(tenantId);
+    if (!session) throw new BadRequestException('No hay caja abierta.');
+
+    if (session.blind_count === null || session.blind_count === undefined) {
+      throw new BadRequestException(
+        'Primero debes realizar el arqueo ciego antes de cerrar la caja.',
+      );
+    }
+
+    const expected = await this.calculateExpectedAmount(
+      tenantId,
+      session.id,
+      session.opening_amount,
+    );
+
+    const blindDifference = Math.round((session.blind_count - expected) * 100) / 100;
+    const absDeviation = Math.abs(blindDifference);
+
+    // Descuadre superior a tolerancia requiere PIN de supervisor
+    if (absDeviation > BLIND_COUNT_TOLERANCE_MXN) {
+      if (!closeDto.supervisorPin) {
+        throw new BadRequestException(
+          `Descuadre de $${absDeviation.toFixed(2)} supera el límite de $${BLIND_COUNT_TOLERANCE_MXN}. Se requiere autorización de supervisor.`,
+        );
+      }
+
+      // Verificar PIN de supervisor directamente (sin importar SupervisorAuthModule para evitar circular dep)
+      const { data: supervisor } = await this.supabase
+        .from('users')
+        .select('id, name')
+        .eq('tenant_id', tenantId)
+        .eq('pin', closeDto.supervisorPin)
+        .eq('active', true)
+        .in('role', ['supervisor', 'admin'])
+        .maybeSingle();
+
+      if (!supervisor) {
+        throw new BadRequestException('PIN de supervisor inválido.');
+      }
+
+      // Registrar log de autorización
+      await this.supabase.from('supervisor_authorizations').insert({
+        tenant_id: tenantId,
+        supervisor_id: supervisor.id,
+        requesting_user_id: userId,
+        action_type: 'cash_discrepancy',
+        reference_id: session.id,
+        reference_table: 'cash_sessions',
+        metadata: {
+          expected,
+          blind_count: session.blind_count,
+          difference: blindDifference,
+        },
+      });
+    }
+
+    const { data, error } = await this.supabase
+      .from('cash_sessions')
+      .update({
+        closing_amount: session.blind_count,
+        expected_amount: expected,
+        blind_difference: blindDifference,
+        close_notes: closeDto.closeNotes ?? null,
+        status: CashSessionStatus.CLOSED,
+        closed_at: new Date().toISOString(),
+      })
+      .eq('id', session.id)
+      .select('*, user:users(id, name)')
+      .single();
+
+    if (error) throw new Error(`Error cerrando caja: ${error.message}`);
+
+    return {
+      ...data,
+      expected_amount: expected,
+      blind_difference: blindDifference,
+      requires_justification: absDeviation > BLIND_COUNT_TOLERANCE_MXN,
+    };
   }
 
   async getSessionHistory(tenantId: string, limit = 10) {
