@@ -17,9 +17,18 @@ CREATE TABLE IF NOT EXISTS products_cost_history (
 );
 
 ALTER TABLE products_cost_history ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tenant_isolation_cost_history"
-    ON products_cost_history FOR ALL
-    USING (tenant_id = get_current_tenant_id());
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE tablename = 'products_cost_history' AND policyname = 'tenant_isolation_cost_history'
+    ) THEN
+        CREATE POLICY "tenant_isolation_cost_history"
+            ON products_cost_history FOR ALL
+            USING (tenant_id = get_current_tenant_id());
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_cost_history_product
     ON products_cost_history(product_id, created_at DESC);
@@ -48,7 +57,7 @@ ALTER TABLE cash_sessions
     ADD COLUMN IF NOT EXISTS blind_count        DECIMAL(10, 2),
     ADD COLUMN IF NOT EXISTS blind_difference   DECIMAL(10, 2),
     ADD COLUMN IF NOT EXISTS close_notes        TEXT,
-    ADD COLUMN IF NOT EXISTS supervisor_id      UUID REFERENCES users(id);
+    ADD COLUMN IF NOT EXISTS supervisor_id      UUID;
 
 -- Detalle de denominaciones contadas físicamente por el cajero
 CREATE TABLE IF NOT EXISTS cash_blind_count_detail (
@@ -78,16 +87,51 @@ CREATE TABLE IF NOT EXISTS supervisor_authorizations (
 );
 
 ALTER TABLE supervisor_authorizations ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "tenant_isolation_supervisor_auth"
-    ON supervisor_authorizations FOR ALL
-    USING (tenant_id = get_current_tenant_id());
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies
+        WHERE tablename = 'supervisor_authorizations' AND policyname = 'tenant_isolation_supervisor_auth'
+    ) THEN
+        CREATE POLICY "tenant_isolation_supervisor_auth"
+            ON supervisor_authorizations FOR ALL
+            USING (tenant_id = get_current_tenant_id());
+    END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS idx_supervisor_auth_tenant
     ON supervisor_authorizations(tenant_id, authorized_at DESC);
 CREATE INDEX IF NOT EXISTS idx_supervisor_auth_action
     ON supervisor_authorizations(action_type, reference_id);
 
--- ── 6. employee_shifts: índice de turnos activos ──────────────────
+-- ── 6. Creación de la tabla employee_shifts si no existe ──────────
+CREATE TABLE IF NOT EXISTS employee_shifts (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    tenant_id   UUID NOT NULL REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id     UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    clock_in    TIMESTAMPTZ DEFAULT NOW(),
+    clock_out   TIMESTAMPTZ,
+    notes       TEXT,
+    created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE employee_shifts ENABLE ROW LEVEL SECURITY;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_policies 
+        WHERE tablename = 'employee_shifts' AND policyname = 'tenant_isolation_shifts'
+    ) THEN
+        CREATE POLICY "tenant_isolation_shifts"
+            ON employee_shifts FOR ALL
+            USING (tenant_id = get_current_tenant_id());
+    END IF;
+END
+$$;
+
+-- ── 7. employee_shifts: índice de turnos activos ──────────────────
 -- Optimiza la consulta más frecuente: ¿tiene turno activo este usuario?
 CREATE INDEX IF NOT EXISTS idx_shifts_active
     ON employee_shifts(tenant_id, user_id)
