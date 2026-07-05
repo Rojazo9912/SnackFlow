@@ -31,14 +31,20 @@ export class CashRegisterService {
   ) {}
 
   async getCurrentSession(tenantId: string) {
+    // IMPORTANT: Use .order + .limit(1) + .maybeSingle() instead of .single().
+    // .single() throws PGRST116 for BOTH "0 rows" AND "multiple rows", which
+    // caused a bug where the service couldn't detect an existing open session
+    // when there were duplicates, and kept creating new ones.
     const { data, error } = await this.supabase
       .from('cash_sessions')
       .select('*, user:users(id, name)')
       .eq('tenant_id', tenantId)
       .eq('status', CashSessionStatus.OPEN)
-      .single();
+      .order('opened_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       throw new Error(`Error obteniendo sesion: ${error.message}`);
     }
 
