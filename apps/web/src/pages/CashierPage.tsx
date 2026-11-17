@@ -20,6 +20,7 @@ import { KeyboardShortcutsHelp } from '../components/KeyboardShortcutsHelp';
 import { CashSummaryWidget } from '../components/CashSummaryWidget';
 import { TicketPreviewModal } from '../components/TicketPreviewModal';
 import { CashMovementModal } from '../components/CashMovementModal';
+import { getTodayLocal, getStartOfDayISO } from '../utils/date';
 import { PaymentModal } from '../components/cashier/PaymentModal';
 import { RecentSalesModal } from '../components/cashier/RecentSalesModal';
 import { OrderDetail } from '../components/cashier/OrderDetail';
@@ -210,9 +211,8 @@ export function CashierPage() {
 
   const loadRecentSales = async () => {
     try {
-      // Get completed orders from today (using local date boundaries)
-      const today = new Date().toLocaleDateString('en-CA');
-      const localStart = new Date(`${today}T00:00:00`).toISOString();
+      // Get completed orders from today (using business-timezone boundaries)
+      const localStart = getStartOfDayISO(getTodayLocal());
       const salesData = await ordersApi.getAll({
         status: 'paid',
         fromDate: localStart
